@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: sgl-trujillo
+    runtime: node
+    plan: free
+    region: virginia
+    buildCommand: npm ci --include=dev && npm run instalarProduccion && npm run construir
+    startCommand: npm run prepararEIniciar
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MODO_DEMOSTRACION
+        value: "true"
+      - key: ZONA_HORARIA
+        value: America/Lima
+      - key: MONTO_COBRO_DEMOSTRACION
+        value: "1"
+      - key: GCS_NOMBRE_BUCKET
+        value: sgl-trujillo-licencias-planos
+      - key: NOMBRE_REMITENTE
+        value: SGL Trujillo
+      - key: URL_BASE_DATOS
+        sync: false
+      - key: CLAVE_JWT
+        generateValue: true
+      - key: CODART_TOKEN
+        sync: false
+      - key: MERCADOPAGO_ACCESS_TOKEN
+        sync: false
+      - key: MERCADOPAGO_CLAVE_WEBHOOK
+        sync: false
+      - key: GCS_PROYECTO_ID
+        sync: false
+      - key: GCS_CORREO_CLIENTE
+        sync: false
+      - key: GCS_CLAVE_PRIVADA
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: CORREO_REMITENTE
+        sync: false

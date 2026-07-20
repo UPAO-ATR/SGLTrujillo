@@ -1,0 +1,42 @@
+services:
+  baseDatos:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sgl
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - datosPostgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sgl"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  servidor:
+    build: ./Servidor
+    env_file: ./Servidor/.env
+    environment:
+      URL_BASE_DATOS: postgresql://postgres:postgres@baseDatos:5432/sgl
+      ORIGEN_CLIENTE: http://localhost:8080
+      URL_PUBLICA_SERVIDOR: http://localhost:3000
+    depends_on:
+      baseDatos:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  cliente:
+    build:
+      context: ./Cliente
+      args:
+        VITE_URL_API: http://localhost:3000/api
+    depends_on:
+      - servidor
+    ports:
+      - "8080:80"
+
+volumes:
+  datosPostgres:

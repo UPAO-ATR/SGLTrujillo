@@ -1,0 +1,70 @@
+/* Define los estilos generales y responsivos de la interfaz. */
+
+@import "tailwindcss";
+
+:root {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #172033;
+  background: #f4f6f8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+:focus-visible {
+  outline: 3px solid #f0b429;
+  outline-offset: 2px;
+}
+
+.TablaResponsiva {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.TablaResponsiva table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.TablaResponsiva th,
+.TablaResponsiva td {
+  border-bottom: 1px solid #d7dde5;
+  padding: 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.TablaResponsiva th {
+  background: #e9edf2;
+  color: #24324a;
+  font-size: 0.875rem;
+}

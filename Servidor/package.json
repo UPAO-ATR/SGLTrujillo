@@ -1,0 +1,43 @@
+{
+  "name": "servidor-sgl-literal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "desarrollo": "node --watch src/Servidor.js",
+    "start": "node src/Servidor.js",
+    "migrar": "node src/Scripts/EjecutarMigraciones.js",
+    "sembrar": "node src/Scripts/SembrarDatos.js",
+    "preparar": "node src/Scripts/PrepararProduccion.js",
+    "respaldo": "node src/Scripts/CrearRespaldo.js",
+    "test": "vitest run --coverage --pool=forks --maxWorkers=1",
+    "escenarioPrimeraVisita": "node src/Scripts/PrepararInspeccionHoy.js 1",
+    "escenarioSegundaVisita": "node src/Scripts/PrepararInspeccionHoy.js 2"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.17.1",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "file-type": "^21.0.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "luxon": "^3.7.2",
+    "mercadopago": "^3.2.0",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
+    "pdf-lib": "^1.17.1",
+    "pdfkit": "^0.17.2",
+    "pg": "^8.16.3",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
+    "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}
