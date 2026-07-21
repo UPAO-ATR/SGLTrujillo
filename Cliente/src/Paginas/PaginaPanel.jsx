@@ -6,9 +6,34 @@ import PaginaSuperAdministrador from "./PaginaSuperAdministrador.jsx";
 
 export default function PaginaPanel() {
   const { Usuario } = useAutenticacion();
-  if (Usuario.Rol === "CAJERO") return <PaginaCajero />;
-  if (Usuario.Rol === "INSPECTOR") return <PaginaInspector />;
-  if (Usuario.Rol === "ADMINISTRADOR") return <PaginaAdministrador />;
-  if (Usuario.Rol === "SUPERADMINISTRADOR") return <PaginaSuperAdministrador />;
-  return <p>Rol no reconocido.</p>;
+  const Rol = String(Usuario?.Rol ?? Usuario?.rol ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (Rol === "CAJERO") return <PaginaCajero />;
+  if (Rol === "INSPECTOR") return <PaginaInspector />;
+  if (Rol === "ADMINISTRADOR") return <PaginaAdministrador />;
+  if (Rol === "SUPERADMINISTRADOR") {
+    return <PaginaSuperAdministrador />;
+  }
+
+  return (
+    <div className="pagina">
+      <h1>Rol no reconocido</h1>
+      <p>
+        La sesiÃ³n fue iniciada, pero el perfil no contiene un rol permitido.
+      </p>
+      <button
+        className="boton"
+        type="button"
+        onClick={() => {
+          localStorage.removeItem("SglToken");
+          localStorage.removeItem("SglUsuario");
+          window.location.replace("/login");
+        }}
+      >
+        Volver a iniciar sesiÃ³n
+      </button>
+    </div>
+  );
 }
