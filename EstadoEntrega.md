@@ -1,34 +1,44 @@
 # Estado de la entrega
 
-## Incluido
+## Implementado
 
-- SGL Trujillo, versión literal.
-- Backend JavaScript y Node.js con Express.
-- Frontend React, Vite y Tailwind CSS.
-- PostgreSQL, migraciones y datos iniciales.
-- Roles, solicitudes, pagos, seguimiento, inspecciones, caja y administración.
-- FIFO, feriados, segunda visita y corrimiento en cascada.
-- Constancia de pago, licencia y marca de agua.
-- CODART, Mercado Pago, Google Cloud Storage y Brevo encapsulados.
-- Render configurado como un solo Web Service.
-- Neon definido como base de datos.
-- Pruebas automáticas y guía completa de despliegue.
+- Aplicación nueva e independiente del flujo anterior.
+- Frontend React responsive.
+- Backend Express modular.
+- PostgreSQL con esquema aislado `sgl_flujo_corregido`.
+- Atención presencial por cajero.
+- Apertura, inyección, cierre, arqueo y alerta de descuadre.
+- Validación RUC 20, local principal/anexos, ubigeo 130101, DNI adulto, correo y PDF.
+- Pago híbrido demostrativo S/3 con efectivo y Yape/Plin.
+- QR dinámico demostrativo y número de operación.
+- Factura para solicitud y boleta para renovación, ambas académicas.
+- Primera inspección a 15 días hábiles, segunda a 30 y capacidad de cuatro por día.
+- Inspector limitado a las inspecciones pendientes del día.
+- Seguimiento público por RUC y local.
+- Estados En proceso, En observación, Rechazado, Aprobado y Vencido.
+- Licencia con 365 días hábiles de vigencia y marca de agua vencida.
+- Notificaciones para cliente e inspector.
+- Administrador y SuperAdministrador limitados a las acciones solicitadas.
+- Simulador temporal flotante global.
+- Scripts de respaldo, instalación, verificación y publicación.
+- Render Blueprint y GitHub Actions.
 
-## Lo único que debe proporcionar el equipo
+## Verificado en esta entrega
 
-Por seguridad, ningún ZIP puede incluir claves privadas de cuentas externas. El equipo debe crear y pegar:
+- 7 pruebas automatizadas aprobadas.
+- Construcción limpia con el mismo comando usado por Render.
+- Carga del frontend de producción con HTTP 200.
+- Importación correcta del servidor.
+- Sintaxis de JavaScript revisada.
+- Creación sintáctica de las 14 tablas en un motor PostgreSQL embebido.
 
-1. Cadena de Neon.
-2. Token de CODART.
-3. Credenciales de prueba de Mercado Pago.
-4. Cuenta de servicio de Google Cloud Storage.
-5. Clave API y remitente verificado de Brevo.
+## Verificación pendiente en la infraestructura del grupo
 
-No quedan proveedores por elegir. `GuiaDespliegueRender.md` indica exactamente qué servicio crear y qué valor copiar.
+No se ejecutó una prueba de extremo a extremo contra la base Neon real porque sus credenciales no están incluidas en el archivo entregado. El primer push debe comprobarse mediante `/api/health` y el recorrido indicado en `GuiaDemostracion.md`.
 
-## Pendiente externo
+## Límites declarados
 
-- Sustituir `Servidor/Recursos/IMAGEN_LICENCIA.jpeg` por la plantilla oficial cuando el equipo la reciba.
-- Ejecutar la prueba integral final después de pegar las credenciales.
-
-La versión pulida no forma parte de esta entrega.
+- El QR representa una orden académica y la confirmación es manual.
+- No existe conexión automática con Yape o Plin.
+- Los comprobantes PDF no son documentos tributarios electrónicos autorizados por SUNAT.
+- Sin GCS, los archivos locales de Render no son persistentes después de reinicios.

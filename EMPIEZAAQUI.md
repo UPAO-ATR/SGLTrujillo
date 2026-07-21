@@ -1,34 +1,51 @@
-# Empieza aquí
+# EMPIEZA AQUÍ
 
-No use Docker para el despliegue recomendado. Render construirá React y ejecutará Node.js directamente.
+## Lo más rápido para reemplazar y desplegar
 
-## Orden exacto
+1. Descomprime esta entrega en una carpeta distinta de `C:\SGLTrujillo`.
+2. Abre PowerShell en la carpeta nueva.
+3. Ejecuta:
 
-1. Suba esta carpeta completa a un repositorio de GitHub llamado `SGLTrujillo`.
-2. Cree la base PostgreSQL en Neon y copie su cadena `Pooled`.
-3. Genere el token gratuito de CODART.
-4. Cree el bucket privado y la cuenta de servicio en Google Cloud Storage.
-5. Verifique un remitente y genere una clave API en Brevo.
-6. Cree una aplicación y obtenga credenciales de prueba en Mercado Pago.
-7. En Render elija `New` y después `Blueprint`, conecte el repositorio y pegue las variables solicitadas.
-8. Cuando el servicio muestre `Live`, configure el webhook de Mercado Pago y pruebe `/api/health`.
-
-Todos los clics, nombres y valores están explicados en `GuiaDespliegueRender.md`.
-
-## Archivos que no debe subir
-
-No cree ni suba archivos `.env`, claves JSON de Google Cloud ni capturas donde se vean tokens. Las credenciales se pegan únicamente en las variables de entorno de Render.
-
-## Nombre visible
-
-La aplicación mostrará:
-
-```text
-SGL Trujillo
-Sistema de Gestión de Licencias de Funcionamiento
-Municipalidad Distrital de Trujillo
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\InstalarEnRepositorioExistente.ps1 -Destino C:\SGLTrujillo
 ```
 
-## Saltos de línea
+El script:
 
-Cada archivo de texto termina con un único salto de línea. Visual Studio Code puede mostrar el número de la línea siguiente vacía; esa línea no contiene código, no se ejecuta y no debe eliminarse manualmente.
+- Exige que el repositorio actual esté limpio.
+- Conserva la versión previa en la rama `version-anterior`.
+- Copia esta versión sin tocar `.git` ni `Servidor\.env`.
+- Crea el commit.
+- Publica en `RepositorioAmigo` y `origin`, si ambos existen.
+- Activa el redespliegue de Render mediante el push a `main`.
+
+## Después del push
+
+1. Entra a Render y abre el servicio existente.
+2. Espera hasta que muestre `Live`.
+3. Abre `https://TUURL.onrender.com/api/health`.
+4. Comprueba:
+
+```text
+Estado: OPERATIVO
+Esquema: sgl_flujo_corregido
+Pago: HIBRIDO_DEMOSTRATIVO
+```
+
+No ejecutes SQL manualmente. La aplicación crea el esquema, las tablas, los usuarios y los feriados automáticamente.
+
+## Primera operación obligatoria
+
+El cajero no puede tramitar nada hasta abrir caja:
+
+1. `cajero1@sgl.pe / Cajero123!` solicita apertura.
+2. `admin@sgl.pe / Admin123!` aprueba la solicitud e indica el fondo inicial.
+3. El cajero actualiza su panel y empieza la atención.
+
+## Documentos útiles
+
+- `GuiaDespliegueRapido.md`: despliegue y variables.
+- `GuiaDemostracion.md`: exposición completa paso por paso.
+- `MatrizCumplimiento.md`: ubicación de cada requisito.
+- `Servidor/DocumentacionApi.md`: rutas del backend.

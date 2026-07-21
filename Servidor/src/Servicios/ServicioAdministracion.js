@@ -1,264 +1,276 @@
-// Aplica las reglas de trabajadores y configuración.
-
 import bcrypt from "bcryptjs";
-import { RolesUsuario } from "../Dominio/RolesUsuario.js";
-import {
-  ErrorAplicacion,
-  ErrorConflicto,
-  ErrorNoEncontrado,
-} from "../Dominio/Errores.js";
-import { CalcularEdad } from "../Utilidades/Fechas.js";
-import { Constantes } from "../Configuracion/Constantes.js";
-function Capitalizar(Texto) {
-  const Limpio = String(Texto || "")
-    .trim()
-    .toLowerCase();
-  return Limpio ? Limpio.charAt(0).toUpperCase() + Limpio.slice(1) : "";
-}
+import { Consultar, Transaccion, Uno } from "../BaseDatos/Conexion.js";
+import { ErrorAplicacion } from "../Dominio/ErrorAplicacion.js";
+import { Auditar } from "./ServicioAuditoria.js";
+
 export class ServicioAdministracion {
-  constructor(Dependencias) {
-    Object.assign(this, Dependencias);
+  async Resumen() {
+    const Solicitudes = await Consultar(
+      `SELECT s.*,u.nombre cajero_nombre,
+              c.estado caja_estado,c.efectivo_esperado
+       FROM solicitudes_caja s
+       JOIN usuarios u ON u.id=s.cajero_id
+       LEFT JOIN cajas c ON c.id=s.caja_id
+       WHERE s.estado='PENDIENTE'
+       ORDER BY s.id`
+    );
+    const Cajeros = await Consultar(
+      "SELECT id,nombre,correo,activo FROM usuarios WHERE rol='CAJERO' ORDER BY id"
+    );
+    const Inspector = await Uno(
+      "SELECT id,nombre,correo,activo FROM usuarios WHERE rol='INSPECTOR' AND activo=TRUE"
+    );
+    const Alertas = await Consultar(
+      "SELECT * FROM alertas_admin ORDER BY id DESC LIMIT 50"
+    );
+    return {
+      SolicitudesCaja: Solicitudes.rows,
+      Cajeros: Cajeros.rows,
+      Inspector,
+      Alertas: Alertas.rows
+    };
   }
-  // Completa los datos y calcula la edad disponible.
-  async ConsultarDni(Dni) {
-    const Datos = await this.ClienteCodart.ConsultarDni(Dni);
-    const Edad = Datos.Edad ?? CalcularEdad(Datos.FechaNacimiento);
-    return { ...Datos, Edad, PuedeValidarEdad: Number.isFinite(Edad) };
-  }
-  // Valida el DNI, la edad y los límites del rol.
-  async CrearTrabajador(Dni, Rol, Usuario) {
-    if (![RolesUsuario.Inspector, RolesUsuario.Cajera].includes(Rol))
-      throw new ErrorAplicacion(
-        "Solo se pueden crear inspectores o cajeras.",
-        "ROL_INVALIDO",
-        400,
+
+  async ResolverSolicitud(AdministradorId, SolicitudId, Aprobar, Monto = null) {
+    const Resultado = await Transaccion(async (Cliente) => {
+      const Consulta = await Cliente.query(
+        `SELECT s.*,c.efectivo_esperado,c.estado caja_estado
+         FROM solicitudes_caja s
+         LEFT JOIN cajas c ON c.id=s.caja_id
+         WHERE s.id=$1
+         FOR UPDATE`,
+        [SolicitudId]
       );
-    if (await this.RepositorioUsuarios.BuscarPorDni(Dni))
-      throw new ErrorConflicto(
-        "El DNI ya pertenece a un trabajador registrado.",
-      );
-    const Datos = await this.ConsultarDni(Dni);
-    if (!Datos.PuedeValidarEdad)
-      throw new ErrorAplicacion(
-        "El proveedor no entregó la fecha de nacimiento necesaria para validar la mayoría de edad.",
-        "EDAD_NO_DISPONIBLE",
-        409,
-      );
-    if (Datos.Edad < 18)
-      throw new ErrorAplicacion(
-        "El trabajador debe ser mayor de edad.",
-        "MENOR_DE_EDAD",
-        400,
-      );
-    if (
-      Rol === RolesUsuario.Inspector &&
-      (await this.RepositorioUsuarios.ContarHabilitadosPorRol(
-        RolesUsuario.Inspector,
-      )) >= 1
-    )
-      throw new ErrorConflicto(
-        "Debe deshabilitar al inspector actual antes de crear su reemplazo.",
-      );
-    if (Rol === RolesUsuario.Cajera) {
-      const Maximo = Number(
-        await this.RepositorioConfiguracion.ObtenerValor(
-          "CantidadMaximaCajeras",
-          Constantes.MaximoCajerasPredeterminado,
-        ),
-      );
-      if (
-        (await this.RepositorioUsuarios.ContarHabilitadosPorRol(
-          RolesUsuario.Cajera,
-        )) >= Maximo
-      )
-        throw new ErrorConflicto(
-          `Ya se alcanzó el máximo de ${Maximo} cajeras habilitadas.`,
+      const Solicitud = Consulta.rows[0];
+      if (!Solicitud || Solicitud.estado !== "PENDIENTE") {
+        throw new ErrorAplicacion(
+          "La solicitud de caja ya fue resuelta.",
+          "SOLICITUD_RESUELTA",
+          409
         );
-    }
-    const Correo = await this.GenerarCorreoInstitucional(Datos, Dni);
-    const ContrasenaTemporal =
-      Rol === RolesUsuario.Inspector ? "inspector123" : "cajera123";
-    const Trabajador = await this.RepositorioUsuarios.Crear({
-      Dni,
-      Nombres: Datos.Nombres,
-      ApellidoPaterno: Datos.ApellidoPaterno,
-      ApellidoMaterno: Datos.ApellidoMaterno,
-      CorreoInstitucional: Correo,
-      ContrasenaHash: await bcrypt.hash(ContrasenaTemporal, 12),
-      Rol,
-      Habilitado: true,
-      HoraEntrada: await this.RepositorioConfiguracion.ObtenerValor(
-        "HoraEntradaTrabajadores",
-        "08:00",
-      ),
+      }
+
+      if (!Aprobar) {
+        await Cliente.query(
+          `UPDATE solicitudes_caja
+           SET estado='RECHAZADA',
+               resuelta_en=NOW(),
+               administrador_id=$2
+           WHERE id=$1`,
+          [SolicitudId, AdministradorId]
+        );
+        if (Solicitud.tipo === "APERTURA") {
+          await Cliente.query(
+            "UPDATE cajas SET estado='RECHAZADA' WHERE id=$1",
+            [Solicitud.caja_id]
+          );
+        }
+        if (Solicitud.tipo === "CIERRE") {
+          await Cliente.query(
+            "UPDATE cajas SET estado='ABIERTA', efectivo_contado=NULL WHERE id=$1",
+            [Solicitud.caja_id]
+          );
+        }
+        return { Estado: "RECHAZADA", Tipo: Solicitud.tipo };
+      }
+
+      if (Solicitud.tipo === "APERTURA") {
+        const Inicial = Number(Monto);
+        if (!(Inicial >= 0)) {
+          throw new ErrorAplicacion(
+            "Indica el monto inicial de la caja.",
+            "MONTO_INVALIDO"
+          );
+        }
+        await Cliente.query(
+          `UPDATE cajas
+           SET estado='ABIERTA',
+               monto_inicial=$2,
+               efectivo_esperado=$2,
+               abierta_en=NOW()
+           WHERE id=$1`,
+          [Solicitud.caja_id, Inicial]
+        );
+        await Cliente.query(
+          `INSERT INTO movimientos_caja(
+             caja_id,tipo,monto,detalle
+           )
+           VALUES($1,'APERTURA',$2,'Fondo inicial autorizado')`,
+          [Solicitud.caja_id, Inicial]
+        );
+      }
+
+      if (Solicitud.tipo === "INYECCION") {
+        const Inyeccion = Number(Solicitud.monto);
+        await Cliente.query(
+          "UPDATE cajas SET efectivo_esperado=efectivo_esperado+$2 WHERE id=$1",
+          [Solicitud.caja_id, Inyeccion]
+        );
+        await Cliente.query(
+          `INSERT INTO movimientos_caja(
+             caja_id,tipo,monto,detalle
+           )
+           VALUES($1,'INYECCION',$2,'Inyección de sencillo autorizada')`,
+          [Solicitud.caja_id, Inyeccion]
+        );
+      }
+
+      if (Solicitud.tipo === "CIERRE") {
+        const Esperado = Number(Solicitud.efectivo_esperado);
+        const Contado = Number(Solicitud.monto_contado);
+        const Diferencia =
+          Math.round((Contado - Esperado) * 100) / 100;
+        await Cliente.query(
+          `UPDATE cajas
+           SET estado='CERRADA',
+               efectivo_contado=$2,
+               diferencia=$3,
+               cerrada_en=NOW()
+           WHERE id=$1`,
+          [Solicitud.caja_id, Contado, Diferencia]
+        );
+        if (Math.abs(Diferencia) > 0.001) {
+          await Cliente.query(
+            `INSERT INTO alertas_admin(tipo,mensaje)
+             VALUES('DESCUADRE_CAJA',$1)`,
+            [
+              `La caja ${Solicitud.caja_id} presenta un descuadre de S/ ${Diferencia.toFixed(2)}.`
+            ]
+          );
+        }
+      }
+
+      await Cliente.query(
+        `UPDATE solicitudes_caja
+         SET estado='APROBADA',
+             resuelta_en=NOW(),
+             administrador_id=$2
+         WHERE id=$1`,
+        [SolicitudId, AdministradorId]
+      );
+      return { Estado: "APROBADA", Tipo: Solicitud.tipo };
     });
-    await this.ServicioAuditoria.Registrar(
-      Usuario,
-      "CREAR_TRABAJADOR",
-      "USUARIO",
-      Trabajador.id,
-      { Rol, Dni, Correo },
+
+    await Auditar(
+      AdministradorId,
+      `${Resultado.Estado}_${Resultado.Tipo}`,
+      "SOLICITUD_CAJA",
+      SolicitudId,
+      { Monto }
     );
-    return { Trabajador, ContrasenaTemporal };
+    return Resultado;
   }
-  // Amplía la cantidad de dígitos hasta obtener un correo único.
-  async GenerarCorreoInstitucional(Datos, Dni) {
-    const Base = `${Capitalizar(Datos.ApellidoPaterno)}${String(
-      Datos.ApellidoMaterno || "",
-    )
-      .charAt(0)
-      .toUpperCase()}`;
-    for (let Cantidad = 3; Cantidad <= 8; Cantidad += 1) {
-      const Correo = `${Base}${Dni.slice(-Cantidad)}@sgl.muni.pe`;
-      if (!(await this.RepositorioUsuarios.BuscarPorCorreo(Correo)))
-        return Correo;
-    }
-    throw new ErrorConflicto(
-      "No fue posible generar un correo institucional único.",
-    );
-  }
-  // Conserva una cajera y un solo inspector habilitado.
-  async CambiarHabilitacionTrabajador(Id, Habilitado, Usuario) {
-    const Trabajador = await this.RepositorioUsuarios.BuscarPorId(Id);
-    if (!Trabajador)
-      throw new ErrorNoEncontrado("No se encontró el trabajador.");
-    if (
-      !Habilitado &&
-      Trabajador.rol === RolesUsuario.Cajera &&
-      (await this.RepositorioUsuarios.ContarHabilitadosPorRol(
-        RolesUsuario.Cajera,
-      )) <= 1
-    )
-      throw new ErrorConflicto(
-        "Debe permanecer al menos una cajera habilitada.",
-      );
-    if (
-      Habilitado &&
-      Trabajador.rol === RolesUsuario.Inspector &&
-      (await this.RepositorioUsuarios.ContarHabilitadosPorRol(
-        RolesUsuario.Inspector,
-      )) >= 1
-    )
-      throw new ErrorConflicto("Solo puede existir un inspector habilitado.");
-    const Actualizado = await this.RepositorioUsuarios.CambiarHabilitacion(
-      Id,
-      Habilitado,
-    );
-    await this.ServicioAuditoria.Registrar(
-      Usuario,
-      Habilitado ? "HABILITAR_TRABAJADOR" : "DESHABILITAR_TRABAJADOR",
-      "USUARIO",
-      Id,
-      { Rol: Trabajador.rol },
-    );
-    return Actualizado;
-  }
-  // Valida cada parámetro antes de guardarlo.
-  async ActualizarConfiguracion(Clave, Valor, Usuario) {
-    let Normalizado = Valor;
-    let Tipo = "NUMERO";
-    if (Clave === "CantidadInspeccionesDiarias") {
-      Normalizado = Number(Valor);
-      if (![6, 7, 8].includes(Normalizado))
-        throw new ErrorAplicacion(
-          "La cantidad de inspecciones debe ser 6, 7 u 8.",
-          "CONFIGURACION_INVALIDA",
-          400,
-        );
-    } else if (Clave === "HoraEntradaTrabajadores") {
-      Tipo = "HORA";
-      const CoincidenciaHora = String(Valor).match(/^(\d{2}):(\d{2})$/);
-      const MinutosEntrada = CoincidenciaHora
-        ? Number(CoincidenciaHora[1]) * 60 + Number(CoincidenciaHora[2])
-        : Number.NaN;
-      if (
-        !Number.isFinite(MinutosEntrada) ||
-        MinutosEntrada < 8 * 60 ||
-        MinutosEntrada > 11 * 60
-      )
-        throw new ErrorAplicacion(
-          "La hora de entrada debe estar entre 08:00 y 11:00.",
-          "CONFIGURACION_INVALIDA",
-          400,
-        );
-      await this.RepositorioUsuarios.ActualizarHoraEntradaTodos(Valor);
-    } else if (Clave === "CantidadMaximaCajeras") {
-      Normalizado = Number(Valor);
-      if (!Number.isInteger(Normalizado) || Normalizado < 1 || Normalizado > 20)
-        throw new ErrorAplicacion(
-          "La cantidad máxima de cajeras debe estar entre 1 y 20.",
-          "CONFIGURACION_INVALIDA",
-          400,
-        );
-    } else if (Clave === "TamanoMaximoPlanoMb") {
-      Normalizado = Number(Valor);
-      if (Normalizado < 1 || Normalizado > 25)
-        throw new ErrorAplicacion(
-          "El tamaño máximo del plano debe estar entre 1 y 25 MB.",
-          "CONFIGURACION_INVALIDA",
-          400,
-        );
-    } else if (Clave === "UmbralSangria") {
-      Normalizado = Number(Valor);
-      if (Normalizado < 180 || Normalizado > 20000)
-        throw new ErrorAplicacion(
-          "El umbral de sangría debe estar entre S/ 180 y S/ 20,000.",
-          "CONFIGURACION_INVALIDA",
-          400,
-        );
-    }
-    const Configuracion = await this.RepositorioConfiguracion.Guardar(
-      Clave,
-      Normalizado,
-      Tipo,
-      Usuario.id,
-    );
-    await this.ServicioAuditoria.Registrar(
-      Usuario,
-      "CAMBIAR_CONFIGURACION",
-      "CONFIGURACION",
-      Configuracion.id,
-      { Clave, Valor: Normalizado },
-    );
-    if (Clave === "CantidadInspeccionesDiarias")
-      await this.ServicioInspecciones.ReordenarDiasConExceso();
-    return Configuracion;
-  }
-  // Permite crear un único administrador habilitado.
-  async CrearAdministrador(Dni, Usuario) {
-    if (
-      (await this.RepositorioUsuarios.ContarHabilitadosPorRol(
-        RolesUsuario.Administrador,
-      )) >= 1
-    )
-      throw new ErrorConflicto("Ya existe un administrador habilitado.");
-    if (await this.RepositorioUsuarios.BuscarPorDni(Dni))
-      throw new ErrorConflicto("El DNI ya está registrado.");
-    const Datos = await this.ConsultarDni(Dni);
-    if (!Datos.PuedeValidarEdad || Datos.Edad < 18)
+
+  async CrearCajero(AdministradorId, Datos) {
+    if (!/^\S+@\S+\.\S+$/.test(Datos.correo || "")) {
       throw new ErrorAplicacion(
-        "El administrador debe ser mayor de edad.",
-        "EDAD_INVALIDA",
-        400,
+        "El correo del cajero no es válido.",
+        "CORREO_INVALIDO"
       );
-    const Correo = await this.GenerarCorreoInstitucional(Datos, Dni);
-    const Administrador = await this.RepositorioUsuarios.Crear({
-      Dni,
-      Nombres: Datos.Nombres,
-      ApellidoPaterno: Datos.ApellidoPaterno,
-      ApellidoMaterno: Datos.ApellidoMaterno,
-      CorreoInstitucional: Correo,
-      ContrasenaHash: await bcrypt.hash("Admin@123", 12),
-      Rol: RolesUsuario.Administrador,
-      Habilitado: true,
-    });
-    await this.ServicioAuditoria.Registrar(
-      Usuario,
-      "CREAR_ADMINISTRADOR",
-      "USUARIO",
-      Administrador.id,
-      { Dni, Correo },
+    }
+    if (String(Datos.clave || "").length < 8) {
+      throw new ErrorAplicacion(
+        "La contraseña debe tener al menos 8 caracteres.",
+        "CLAVE_CORTA"
+      );
+    }
+    const Hash = await bcrypt.hash(Datos.clave, 11);
+    try {
+      const Resultado = await Consultar(
+        `INSERT INTO usuarios(nombre,correo,clave_hash,rol)
+         VALUES($1,LOWER($2),$3,'CAJERO')
+         RETURNING id,nombre,correo,activo`,
+        [Datos.nombre, Datos.correo, Hash]
+      );
+      await Auditar(
+        AdministradorId,
+        "CREAR_CAJERO",
+        "USUARIO",
+        Resultado.rows[0].id
+      );
+      return Resultado.rows[0];
+    } catch (Error) {
+      if (Error.code === "23505") {
+        throw new ErrorAplicacion(
+          "El correo ya está registrado.",
+          "CORREO_EXISTENTE",
+          409
+        );
+      }
+      throw Error;
+    }
+  }
+
+  async QuitarCajero(AdministradorId, CajeroId) {
+    const Cantidad = await Uno(
+      "SELECT COUNT(*)::int cantidad FROM usuarios WHERE rol='CAJERO' AND activo=TRUE"
     );
-    return { Administrador, ContrasenaTemporal: "Admin@123" };
+    if (Number(Cantidad.cantidad) <= 2) {
+      throw new ErrorAplicacion(
+        "El sistema debe conservar como mínimo dos cajeros activos.",
+        "MINIMO_CAJEROS",
+        409
+      );
+    }
+    await Consultar(
+      "UPDATE usuarios SET activo=FALSE WHERE id=$1 AND rol='CAJERO'",
+      [CajeroId]
+    );
+    await Auditar(
+      AdministradorId,
+      "QUITAR_CAJERO",
+      "USUARIO",
+      CajeroId
+    );
+    return { Exito: true };
+  }
+
+  async ModificarInspector(AdministradorId, Datos) {
+    const Inspector = await Uno(
+      "SELECT id FROM usuarios WHERE rol='INSPECTOR' AND activo=TRUE"
+    );
+    if (!Inspector) {
+      throw new ErrorAplicacion(
+        "No existe inspector activo.",
+        "SIN_INSPECTOR",
+        404
+      );
+    }
+    if (Datos.correo) {
+      await Consultar(
+        "UPDATE usuarios SET correo=LOWER($2) WHERE id=$1",
+        [Inspector.id, Datos.correo]
+      );
+    }
+    if (Datos.clave) {
+      if (String(Datos.clave).length < 8) {
+        throw new ErrorAplicacion(
+          "La contraseña debe tener al menos 8 caracteres.",
+          "CLAVE_CORTA"
+        );
+      }
+      await Consultar(
+        "UPDATE usuarios SET clave_hash=$2 WHERE id=$1",
+        [Inspector.id, await bcrypt.hash(Datos.clave, 11)]
+      );
+    }
+    await Auditar(
+      AdministradorId,
+      "MODIFICAR_INSPECTOR",
+      "USUARIO",
+      Inspector.id
+    );
+    return Uno(
+      "SELECT id,nombre,correo,activo FROM usuarios WHERE id=$1",
+      [Inspector.id]
+    );
+  }
+
+  async MarcarAlerta(AlertaId) {
+    await Consultar(
+      "UPDATE alertas_admin SET leida=TRUE WHERE id=$1",
+      [AlertaId]
+    );
+    return { Exito: true };
   }
 }

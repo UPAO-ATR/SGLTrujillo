@@ -1,74 +1,47 @@
-# API REST
+# API principal
 
-Todas las respuestas JSON usan `Exito` y `Datos`. Los errores incluyen `Mensaje`, `Codigo` y, cuando corresponde, `Detalles`.
-
-## Salud
+## Público
 
 - `GET /api/health`
-
-## Públicas y ciudadano
-
-- `GET /api/negocios/ruc/:ruc`
-- `POST /api/solicitudes`
-- `GET /api/solicitudes/:codigo`
-- `POST /api/solicitudes/:id/plano?Codigo=...`
-- `GET /api/solicitudes/:id/plano/descargar?Codigo=...`
-- `POST /api/solicitudes/:id/checkout?Codigo=...`
-- `POST /api/pagos/webhook`
-- `POST /api/pagos/:id/confirmarDemostracion?Codigo=...`
-- `POST /api/pagos/:id/confirmarPresencial` (solo cajera)
-- `GET /api/boletas/:solicitudId/descargar?Codigo=...`
-- `GET /api/licencias/ruc/:ruc`
-- `GET /api/licencias/:solicitudId/descargar?Codigo=...`
-
-## Autenticación
-
+- `GET /api/tiempo`
+- `PUT /api/tiempo`
 - `POST /api/auth/login`
-- `GET /api/auth/sesion`
-- `POST /api/auth/cambiarContrasena`
+- `GET /api/publico/seguimiento/:ruc`
+- `GET /api/publico/licencias/:id/:ruc`
 
-## Inspector y administrador
-
-- `GET /api/inspecciones`
-- `GET /api/inspecciones/:id`
-- `PATCH /api/inspecciones/:id`
-- `POST /api/inspecciones/:id/observaciones`
-- `POST /api/inspecciones/tareas/reprogramar`
-
-El administrador puede consultar; únicamente el inspector puede registrar resultados.
-
-## Cajera
+## Cajero
 
 - `GET /api/caja/actual`
-- `POST /api/caja/abrir`
-- `POST /api/caja/transacciones`
-- `POST /api/caja/sangrias`
-- `POST /api/caja/arqueo`
-- `POST /api/caja/cerrar`
+- `POST /api/caja/apertura`
+- `POST /api/caja/inyeccion`
+- `POST /api/caja/cierre`
+- `GET /api/cajero/ruc/:ruc`
+- `POST /api/cajero/dni`
+- `POST /api/cajero/solicitudes`
+- `POST /api/cajero/solicitudes/:id/pago`
+- `GET /api/cajero/renovaciones/:ruc`
+- `POST /api/cajero/renovaciones/:id`
+- `GET /api/cajero/historial`
+- `GET /api/cajero/comprobantes/:id`
 
-## Administración
+## Inspector
 
-- `GET /api/inspectores`
-- `POST /api/inspectores`
-- `PATCH /api/inspectores/:id/disponibilidad`
-- `GET /api/administracion/inspectores`
-- `GET /api/administracion/cajeras`
-- `GET /api/administracion/trabajadores/dni/:dni`
-- `POST /api/administracion/trabajadores`
-- `PATCH /api/administracion/trabajadores/:id/habilitacion`
-- `GET /api/administracion/configuraciones`
-- `PATCH /api/administracion/configuraciones`
-- `GET /api/administracion/feriados`
-- `POST /api/administracion/feriados`
-- `GET /api/administracion/alertas`
-- `PATCH /api/administracion/alertas/:id/atendida`
-- `GET /api/administracion/auditoria`
+- `GET /api/inspector/hoy`
+- `GET /api/inspector/inspecciones/:id`
+- `GET /api/inspector/inspecciones/:id/plano`
+- `POST /api/inspector/inspecciones/:id/aprobar`
+- `POST /api/inspector/inspecciones/:id/observar`
 
-## Super administrador
+## Administrador
 
-- `POST /api/administracion/administradores`
-- `GET /api/administracion/auditoria`
+- `GET /api/administrador/resumen`
+- `POST /api/administrador/solicitudes-caja/:id`
+- `POST /api/administrador/cajeros`
+- `DELETE /api/administrador/cajeros/:id`
+- `PUT /api/administrador/inspector`
+- `PUT /api/administrador/alertas/:id`
 
-## Archivos temporales en modo local
+## SuperAdministrador
 
-- `GET /api/archivos/local/:token`
+- `GET /api/superadministrador/administrador`
+- `PUT /api/superadministrador/administrador`

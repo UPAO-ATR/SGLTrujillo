@@ -1,23 +1,8 @@
-// Registra las acciones relevantes del sistema.
+import { Consultar } from "../BaseDatos/Conexion.js";
 
-export class ServicioAuditoria {
-  constructor(RepositorioAuditoria) {
-    this.RepositorioAuditoria = RepositorioAuditoria;
-  }
-  async Registrar(Usuario, Accion, Entidad, EntidadId, Detalles, Cliente) {
-    const NombreUsuario = Usuario
-      ? `${Usuario.nombres || ""} ${Usuario.apellido_paterno || ""}`.trim()
-      : "SISTEMA";
-    return this.RepositorioAuditoria.Registrar(
-      {
-        UsuarioId: Usuario?.id,
-        NombreUsuario,
-        Accion,
-        Entidad,
-        EntidadId,
-        Detalles,
-      },
-      Cliente,
-    );
-  }
+export async function Auditar(UsuarioId, Accion, Entidad, EntidadId, Detalle = {}) {
+  await Consultar(
+    "INSERT INTO auditoria(usuario_id, accion, entidad, entidad_id, detalle) VALUES($1,$2,$3,$4,$5)",
+    [UsuarioId || null, Accion, Entidad, EntidadId ? String(EntidadId) : null, Detalle]
+  );
 }

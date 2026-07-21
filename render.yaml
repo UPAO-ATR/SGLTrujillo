@@ -1,42 +1,42 @@
 services:
   - type: web
-    name: sgl-trujillo
+    name: sgl-trujillo-flujo-corregido
     runtime: node
     plan: free
-    region: virginia
+    region: oregon
+    branch: main
     buildCommand: npm ci --include=dev && npm run instalarProduccion && npm run construir
     startCommand: npm run prepararEIniciar
     healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
       - key: MODO_DEMOSTRACION
-        value: "true"
+        value: true
+      - key: MONTO_COBRO_FLUJO_CORREGIDO
+        value: 3
       - key: ZONA_HORARIA
         value: America/Lima
-      - key: MONTO_COBRO_DEMOSTRACION
-        value: "1"
-      - key: GCS_NOMBRE_BUCKET
-        value: sgl-trujillo-licencias-planos
-      - key: NOMBRE_REMITENTE
-        value: SGL Trujillo
+      - key: ESQUEMA_BASE_DATOS
+        value: sgl_flujo_corregido
       - key: URL_BASE_DATOS
         sync: false
       - key: CLAVE_JWT
         generateValue: true
       - key: CODART_TOKEN
         sync: false
-      - key: MERCADOPAGO_ACCESS_TOKEN
+      - key: BREVO_API_KEY
         sync: false
-      - key: MERCADOPAGO_CLAVE_WEBHOOK
+      - key: CORREO_REMITENTE
+        sync: false
+      - key: NOMBRE_REMITENTE
+        value: SGL Trujillo
+      - key: GCS_NOMBRE_BUCKET
         sync: false
       - key: GCS_PROYECTO_ID
         sync: false
       - key: GCS_CORREO_CLIENTE
         sync: false
       - key: GCS_CLAVE_PRIVADA
-        sync: false
-      - key: BREVO_API_KEY
-        sync: false
-      - key: CORREO_REMITENTE
         sync: false

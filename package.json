@@ -1,13 +1,13 @@
 {
-  "name": "sgl-trujillo-version-literal",
+  "name": "sgl-trujillo-flujo-corregido",
+  "version": "2.0.0",
   "private": true,
-  "version": "1.0.0",
   "scripts": {
     "instalar": "npm ci --include=dev && npm --prefix Servidor ci && npm --prefix Cliente ci",
     "instalarProduccion": "npm --prefix Servidor ci --omit=dev && npm --prefix Cliente ci --include=dev",
     "desarrollo": "concurrently \"npm --prefix Servidor run desarrollo\" \"npm --prefix Cliente run desarrollo\"",
-    "probar": "npm --prefix Servidor test && npm --prefix Cliente test",
     "construir": "npm --prefix Cliente run construir",
+    "probar": "npm --prefix Servidor test && npm --prefix Cliente test",
     "prepararEIniciar": "npm --prefix Servidor run preparar && npm --prefix Servidor start",
     "iniciar": "npm --prefix Servidor start"
   },

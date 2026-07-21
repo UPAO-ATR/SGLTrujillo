@@ -1,54 +1,43 @@
-// Envía correos y controla los reintentos del proveedor.
+import { Configuracion } from "../../Configuracion/Configuracion.js";
 
-import { ConfiguracionEntorno } from "../../Configuracion/ConfiguracionEntorno.js";
+function EscaparHtml(Valor) {
+  return String(Valor)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 export class ClienteCorreo {
-  constructor(Configuracion = ConfiguracionEntorno) {
-    this.Configuracion = Configuracion;
+  Configurado() {
+    return Boolean(Configuracion.BrevoApiKey && Configuracion.CorreoRemitente);
   }
 
-  EstaConfigurado() {
-    return Boolean(
-      this.Configuracion.BrevoApiKey &&
-        this.Configuracion.CorreoRemitente &&
-        this.Configuracion.NombreRemitente,
-    );
+  Estado() {
+    return this.Configurado() ? "BREVO_CONFIGURADO" : "REGISTRO_LOCAL";
   }
 
-  // Usa Brevo cuando existe una clave configurada.
-  async Enviar(Destinatario, Asunto, Contenido) {
-    if (!this.EstaConfigurado()) {
-      console.log(
-        `[CORREO DEMOSTRACION] ${Destinatario} | ${Asunto} | ${Contenido}`,
-      );
-      return { Id: "LOCAL" };
+  async Enviar(Destino, Asunto, Mensaje) {
+    if (!this.Configurado()) {
+      console.log(`[CORREO LOCAL] Para: ${Destino} | ${Asunto} | ${Mensaje}`);
+      return { Modo: "REGISTRO_LOCAL" };
     }
-
     const Respuesta = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "api-key": this.Configuracion.BrevoApiKey,
-      },
+      headers: { "api-key": Configuracion.BrevoApiKey, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
-        sender: {
-          email: this.Configuracion.CorreoRemitente,
-          name: this.Configuracion.NombreRemitente,
-        },
-        to: [{ email: Destinatario }],
+        sender: { email: Configuracion.CorreoRemitente, name: Configuracion.NombreRemitente },
+        to: [{ email: Destino }],
         subject: Asunto,
-        textContent: Contenido,
-      }),
+        htmlContent: `<div style="font-family:Arial,sans-serif;line-height:1.5"><h2>SGL Trujillo</h2><p>${EscaparHtml(Mensaje)}</p></div>`,
+        textContent: Mensaje
+      })
     });
-
-    const Datos = await Respuesta.json().catch(() => null);
     if (!Respuesta.ok) {
-      throw new Error(
-        Datos?.message || "Brevo no pudo enviar el correo electrónico.",
-      );
+      const Cuerpo = await Respuesta.text();
+      throw new Error(`Brevo rechazó el correo: ${Cuerpo}`);
     }
-
-    return { Id: Datos?.messageId || "BREVO" };
+    return { Modo: "BREVO" };
   }
 }

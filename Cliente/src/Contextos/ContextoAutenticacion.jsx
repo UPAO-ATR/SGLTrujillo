@@ -1,64 +1,28 @@
-// Comparte la sesión del usuario entre todas las pantallas.
+import { createContext, useContext, useMemo, useState } from "react";
+import { Api } from "../Servicios/ClienteApi.js";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import {
-  IniciarSesion as IniciarSesionApi,
-  ObtenerSesion,
-} from "../Servicios/ServicioAutenticacion.js";
+const Contexto = createContext(null);
 
-const ContextoAutenticacion = createContext(null);
+function LeerUsuario() {
+  try { return JSON.parse(localStorage.getItem("SglUsuario") || "null"); } catch { return null; }
+}
 
-// Restaura la sesión guardada al iniciar la aplicación.
 export function ProveedorAutenticacion({ children }) {
-  const [Usuario, setUsuario] = useState(null);
-  const [CargandoSesion, setCargandoSesion] = useState(true);
-
-  useEffect(() => {
-    async function RestaurarSesion() {
-      const Token = localStorage.getItem("TokenSgl");
-      if (!Token) {
-        setCargandoSesion(false);
-        return;
-      }
-
-      try {
-        setUsuario(await ObtenerSesion());
-      } catch {
-        localStorage.removeItem("TokenSgl");
-      } finally {
-        setCargandoSesion(false);
-      }
-    }
-
-    RestaurarSesion();
-  }, []);
-
-  // Guarda el token y los datos del usuario autenticado.
-  async function IniciarSesion(Correo, Contrasena) {
-    const Datos = await IniciarSesionApi(Correo, Contrasena);
-    localStorage.setItem("TokenSgl", Datos.Token);
-    setUsuario(Datos.Usuario);
-    return Datos.Usuario;
+  const [Usuario, DefinirUsuario] = useState(LeerUsuario);
+  async function Entrar(correo, clave) {
+    const Resultado = await Api.Post("/auth/login", { correo, clave });
+    localStorage.setItem("SglToken", Resultado.Token);
+    localStorage.setItem("SglUsuario", JSON.stringify(Resultado.Usuario));
+    DefinirUsuario(Resultado.Usuario);
+    return Resultado.Usuario;
   }
-
-  // Elimina toda la información local de la sesión.
-  function CerrarSesion() {
-    localStorage.removeItem("TokenSgl");
-    setUsuario(null);
+  function Salir() {
+    localStorage.removeItem("SglToken");
+    localStorage.removeItem("SglUsuario");
+    DefinirUsuario(null);
   }
-
-  const Valor = useMemo(
-    () => ({ Usuario, CargandoSesion, IniciarSesion, CerrarSesion }),
-    [Usuario, CargandoSesion],
-  );
-
-  return (
-    <ContextoAutenticacion.Provider value={Valor}>
-      {children}
-    </ContextoAutenticacion.Provider>
-  );
+  const Valor = useMemo(() => ({ Usuario, Entrar, Salir }), [Usuario]);
+  return <Contexto.Provider value={Valor}>{children}</Contexto.Provider>;
 }
 
-export function UsarAutenticacion() {
-  return useContext(ContextoAutenticacion);
-}
+export const useAutenticacion = () => useContext(Contexto);

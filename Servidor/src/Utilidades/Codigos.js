@@ -1,21 +1,16 @@
-// Genera códigos únicos para pagos, inspecciones y documentos.
+import crypto from "node:crypto";
 
-import { randomBytes } from "node:crypto";
-const Caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-export function GenerarCodigoAleatorio(Longitud = 8) {
-  const Bytes = randomBytes(Longitud);
-  return Array.from(
-    Bytes,
-    (Valor) => Caracteres[Valor % Caracteres.length],
-  ).join("");
+export function CodigoTramite() {
+  const Fecha = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  return `SGL-${Fecha}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 }
-export function GenerarCodigoPago() {
-  return `PAGO${Date.now()}${GenerarCodigoAleatorio(5)}`;
+
+export function NumeroLicencia(Id) {
+  const Fecha = new Date().toISOString().slice(0, 4);
+  return `LF-${Fecha}-${String(Id).padStart(6, "0")}`;
 }
-export function GenerarNumeroBoleta(Id) {
-  return `CP-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${String(Id).padStart(6, "0")}`;
-}
-export function GenerarNumeroLicencia(Id, Fecha = new Date()) {
-  const Dia = Fecha.toISOString().slice(0, 10).replaceAll("-", "");
-  return `LF-${Dia}-${String(Id).padStart(6, "0")}`;
+
+export function ClaveArchivo(Prefijo, Nombre = "archivo") {
+  const Limpio = Nombre.replace(/[^a-zA-Z0-9.]/g, "-");
+  return `${Prefijo}/${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${Limpio}`;
 }

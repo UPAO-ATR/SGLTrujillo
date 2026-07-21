@@ -1,7 +1,9 @@
 node_modules/
-dist/
-coverage/
-.env
-*.log
+Cliente/dist/
 Servidor/AlmacenLocal/
-Servidor/Respaldos/
+Servidor/.env
+Cliente/.env
+.env
+coverage/
+*.log
+.DS_Store

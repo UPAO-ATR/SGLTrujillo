@@ -1,147 +1,16 @@
-// Presenta las inspecciones pendientes del día.
-
 import { useEffect, useState } from "react";
-import Boton from "../Componentes/Boton.jsx";
-import Estado from "../Componentes/Estado.jsx";
-import Mensaje from "../Componentes/Mensaje.jsx";
-import Panel from "../Componentes/Panel.jsx";
-import Tabla from "../Componentes/Tabla.jsx";
-import TituloPagina from "../Componentes/TituloPagina.jsx";
-import {
-  ListarInspecciones,
-  ObtenerInspeccion,
-  RegistrarResultadoInspeccion,
-} from "../Servicios/ServicioInspecciones.js";
-import DetalleInspeccion from "../Inspecciones/DetalleInspeccion.jsx";
+import { Api, AbrirArchivoProtegido } from "../Servicios/ClienteApi.js";
+import { Area, Boton, Mensaje, Seccion } from "../Componentes/Comunes.jsx";
 
 export default function PaginaInspector() {
-  const [Inspecciones, setInspecciones] = useState([]);
-  const [Seleccionada, setSeleccionada] = useState(null);
-  const [Observaciones, setObservaciones] = useState("");
-  const [MensajeError, setMensajeError] = useState("");
-  const [MensajeExito, setMensajeExito] = useState("");
-  const [Cargando, setCargando] = useState(true);
-  const [Ocupado, setOcupado] = useState(false);
-
-  // Carga únicamente las inspecciones pendientes del día.
-  async function CargarInspecciones() {
-    try {
-      setCargando(true);
-      setMensajeError("");
-      setInspecciones(await ListarInspecciones());
-    } catch (Error) {
-      setMensajeError(Error.message);
-    } finally {
-      setCargando(false);
-    }
-  }
-
-  useEffect(() => {
-    CargarInspecciones();
-  }, []);
-
-  async function VerDetalle(Inspeccion) {
-    try {
-      setOcupado(true);
-      setMensajeError("");
-      setSeleccionada(await ObtenerInspeccion(Inspeccion.id));
-      setObservaciones("");
-    } catch (Error) {
-      setMensajeError(Error.message);
-    } finally {
-      setOcupado(false);
-    }
-  }
-
-  // Envía la aprobación o las observaciones registradas.
-  async function Registrar(Resultado) {
-    if (Resultado === "OBSERVADO" && !Observaciones.trim()) {
-      setMensajeError("Debe escribir al menos una observación.");
-      return;
-    }
-
-    try {
-      setOcupado(true);
-      setMensajeError("");
-      await RegistrarResultadoInspeccion(
-        Seleccionada.id,
-        Resultado,
-        Observaciones.trim(),
-      );
-      setMensajeExito(
-        Resultado === "APROBADO"
-          ? "La inspección fue aprobada y la licencia se generó."
-          : "Las observaciones fueron registradas.",
-      );
-      setSeleccionada(null);
-      await CargarInspecciones();
-    } catch (Error) {
-      setMensajeError(Error.message);
-    } finally {
-      setOcupado(false);
-    }
-  }
-
-  // Retira de la lista cada inspección ya resuelta.
-  return (
-    <>
-      <TituloPagina
-        Titulo="Inspecciones del día"
-        Descripcion="Solo se muestran las inspecciones pendientes asignadas para la fecha actual. Al registrar el resultado, la inspección desaparecerá de la lista."
-      />
-      <div className="space-y-4">
-        <Mensaje Tipo="error">{MensajeError}</Mensaje>
-        <Mensaje Tipo="exito">{MensajeExito}</Mensaje>
-      </div>
-
-      <Panel className="mt-5" Titulo="Agenda de trabajo">
-        {Cargando ? (
-          <p className="py-6 text-center text-[#536174]">
-            Cargando inspecciones...
-          </p>
-        ) : (
-          <Tabla
-            Filas={Inspecciones}
-            MensajeVacio="No hay inspecciones pendientes para hoy."
-            Columnas={[
-              { Clave: "orden_dia", Titulo: "Orden" },
-              { Clave: "hora_programada", Titulo: "Hora" },
-              { Clave: "razon_social", Titulo: "Negocio" },
-              { Clave: "ruc", Titulo: "RUC" },
-              { Clave: "numero_visita", Titulo: "Visita" },
-              {
-                Clave: "estado",
-                Titulo: "Estado",
-                Renderizar: (Fila) => <Estado Valor={Fila.estado} />,
-              },
-              {
-                Clave: "acciones",
-                Titulo: "Acciones",
-                Renderizar: (Fila) => (
-                  <Boton
-                    Variante="secundario"
-                    onClick={() => VerDetalle(Fila)}
-                    Ocupado={Ocupado}
-                  >
-                    Ver detalle
-                  </Boton>
-                ),
-              },
-            ]}
-          />
-        )}
-      </Panel>
-
-      <DetalleInspeccion
-        Inspeccion={Seleccionada}
-        Observaciones={Observaciones}
-        AlCambiarObservaciones={setObservaciones}
-        AlAprobar={() => Registrar("APROBADO")}
-        AlObservar={() => Registrar("OBSERVADO")}
-        AlCerrar={() => setSeleccionada(null)}
-        AlInformarError={setMensajeError}
-        Ocupado={Ocupado}
-      />
-    </>
-  );
+  const [Datos, DefinirDatos] = useState({ Inspecciones: [] });
+  const [Detalle, DefinirDetalle] = useState(null);
+  const [Observaciones, DefinirObservaciones] = useState("");
+  const [Mensaje, DefinirMensaje] = useState("");
+  async function Cargar() { try { DefinirDatos(await Api.Get("/inspector/hoy")); DefinirDetalle(null); } catch (Error) { DefinirMensaje(Error.message); } }
+  useEffect(() => { Cargar(); const F = () => Cargar(); window.addEventListener("tiempoActualizado", F); return () => window.removeEventListener("tiempoActualizado", F); }, []);
+  async function Abrir(Id) { try { const R = await Api.Get(`/inspector/inspecciones/${Id}`); DefinirDetalle(R.Inspeccion); DefinirObservaciones(""); } catch (Error) { DefinirMensaje(Error.message); } }
+  async function Aprobar() { try { const R = await Api.Post(`/inspector/inspecciones/${Detalle.id}/aprobar`, {}); DefinirMensaje(`Licencia aprobada. Vence el ${R.FechaVencimientoFormateada}.`); await Cargar(); } catch (Error) { DefinirMensaje(Error.message); } }
+  async function Observar() { try { const R = await Api.Post(`/inspector/inspecciones/${Detalle.id}/observar`, { observaciones: Observaciones }); DefinirMensaje(R.Estado === "RECHAZADO" ? "El trámite fue rechazado después de la segunda inspección." : `Segunda inspección programada para ${R.FechaSegundaFormateada}.`); await Cargar(); } catch (Error) { DefinirMensaje(Error.message); } }
+  return <div className="pagina"><h1>Inspecciones del día</h1><p>Fecha simulada: <b>{Datos.Fecha || "-"}</b>. Solo se muestran las inspecciones pendientes de hoy, con un máximo de cuatro.</p><Mensaje>{Mensaje}</Mensaje>{!Detalle && <Seccion titulo={`Pendientes (${Datos.Inspecciones?.length || 0}/4)`}>{Datos.Inspecciones?.length ? <div className="tarjetas">{Datos.Inspecciones.map((Item) => <button className="tarjeta seleccionable" key={Item.id} onClick={() => Abrir(Item.id)}><strong>{Item.razon_social}</strong><span>RUC: {Item.ruc}</span><span>{Item.direccion}</span><b>{Item.numero === 1 ? "Primera inspección" : "Segunda inspección"}</b></button>)}</div> : <Mensaje>No tienes inspecciones por completar en esta fecha.</Mensaje>}</Seccion>}{Detalle && <Seccion titulo={`Detalle de inspección ${Detalle.numero}`} acciones={<Boton secundario onClick={() => DefinirDetalle(null)}>Volver</Boton>}><div className="detalle"><div><span>RUC</span><b>{Detalle.ruc}</b></div><div><span>Razón social</span><b>{Detalle.razon_social}</b></div><div><span>Dirección</span><b>{Detalle.direccion}</b></div><div><span>Visita</span><b>{Detalle.numero === 1 ? "Primera" : "Segunda"}</b></div>{Detalle.numero === 2 && <div className="ancho"><span>Observaciones anteriores</span><b>{Detalle.observaciones_anteriores}</b></div>}</div><div className="acciones"><Boton secundario onClick={() => AbrirArchivoProtegido(`/inspector/inspecciones/${Detalle.id}/plano`)}>Descargar plano PDF</Boton><Boton onClick={Aprobar}>Aprobar licencia</Boton></div><Area etiqueta={Detalle.numero === 1 ? "Observaciones de la primera inspección" : "Motivo de rechazo en segunda inspección"} minLength="10" rows="4" value={Observaciones} onChange={(e) => DefinirObservaciones(e.target.value)} placeholder="Mínimo 10 caracteres" /><Boton peligro disabled={Observaciones.trim().length < 10} onClick={Observar}>{Detalle.numero === 1 ? "Registrar observaciones" : "Rechazar trámite"}</Boton></Seccion>}</div>;
 }

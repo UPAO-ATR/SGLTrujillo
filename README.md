@@ -1,123 +1,108 @@
-# SGL Trujillo
+# SGL Trujillo — Flujo corregido
 
-## Sistema de Gestión de Licencias de Funcionamiento
+Aplicación nueva construida específicamente para el flujo presencial corregido del Sistema de Gestión de Licencias de Funcionamiento.
 
-**Municipalidad Distrital de Trujillo**
+## Flujo implementado
 
-Esta carpeta contiene la primera entrega: la versión literal y demostrativa construida a partir de los tres documentos incluidos en `DocumentosFuente`.
-
-La versión pulida se desarrollará después de validar esta versión. Los únicos cambios aplicados al documento original están registrados en `AjustesJustosYNecesarios.md`, indicando qué requisito o sección resulta afectado.
-
-## Proveedores ya elegidos
-
-No es necesario escoger servicios adicionales:
-
-- Alojamiento web: Render Free, un solo Web Service.
-- Base de datos: Neon PostgreSQL Free.
-- Consulta de RUC y DNI: CODART Free.
-- Pagos: Mercado Pago con credenciales de prueba.
-- Archivos privados: Google Cloud Storage.
-- Correos: Brevo Free.
-- Repositorio y despliegue automático: GitHub.
-
-Las razones y el alcance de cada elección están en `ProveedoresElegidos.md`.
+- El cliente realiza la solicitud o renovación presencialmente mediante un cajero.
+- Existen como mínimo dos cajeros y exactamente un inspector, un administrador y un superadministrador activos.
+- El cajero solicita autorización para abrir y cerrar caja.
+- El administrador autoriza aperturas, inyecciones de sencillo, cierres y arqueos.
+- El RUC debe comenzar con 20, estar activo y tener al menos un local activo en el ubigeo 130101.
+- Se revisan el local principal y los locales anexos; si hay varios válidos, el cajero selecciona la dirección.
+- Se valida DNI, mayoría de edad, correo y plano PDF.
+- Se muestra una tasa oficial de S/180 y se registra un cobro académico de S/3.
+- El pago puede ser efectivo, Yape/Plin o una combinación exacta de ambos.
+- La aplicación genera un QR dinámico demostrativo con el monto digital.
+- La primera inspección se programa después de 15 días hábiles y la segunda después de 30.
+- Solo se programan cuatro inspecciones por día.
+- El inspector solo ve las inspecciones pendientes de la fecha simulada.
+- La licencia aprobada tiene 365 días hábiles de vigencia.
+- La licencia vencida se descarga con marca de agua.
+- Todas las interfaces incluyen un simulador flotante de fecha.
+- Las notificaciones se envían mediante Brevo cuando está configurado o se registran en consola en modo local.
 
 ## Tecnologías
 
-- Backend: JavaScript, Node.js y Express.
-- Frontend: React, Vite y Tailwind CSS.
-- Base de datos: PostgreSQL.
-- Pruebas: Vitest.
-- Despliegue: Render mediante `render.yaml`.
+- React + Vite
+- Node.js + Express
+- PostgreSQL / Neon
+- CODART para RUC y DNI
+- Brevo para correo
+- Google Cloud Storage opcional
+- Render para despliegue
 
-## Despliegue recomendado
+No se utiliza Mercado Pago, un POS móvil ni el S24 Ultra. El pago híbrido se representa y concilia dentro del propio sistema.
 
-El frontend se construye y el mismo servidor Express lo publica. Por ello, Render crea un solo servicio y no es necesario copiar URLs entre un frontend y un backend separados.
+## Inicio rápido local
 
-Siga, en este orden:
+1. Copia `Servidor/.env.ejemplo` como `Servidor/.env`.
+2. Completa `URL_BASE_DATOS` y `CLAVE_JWT`.
+3. Ejecuta:
 
-1. `EMPIEZAAQUI.md`
-2. `GuiaDespliegueRender.md`
-3. `GuiaDemostracion.md`
-4. `InformeVerificacion.md`
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\PrepararProyecto.ps1
+.\IniciarProyecto.ps1
+```
 
-## Estructura principal
+4. Abre `http://localhost:5173`.
+
+## Sustitución y despliegue automáticos
+
+Desde la carpeta descomprimida:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\InstalarEnRepositorioExistente.ps1 -Destino C:\SGLTrujillo
+```
+
+El script respalda la versión anterior en una rama, copia el nuevo código, crea el commit y publica en los remotos disponibles. Si Render tiene Auto-Deploy activo, el despliegue comienza con el push.
+
+Para futuras modificaciones:
+
+```powershell
+.\PublicarActualizacion.ps1 -Mensaje "Describe el cambio"
+```
+
+## Base de datos independiente
+
+La nueva versión crea el esquema PostgreSQL:
 
 ```text
-SGLTrujillo/
-├── Cliente/                    Frontend React
-├── Servidor/                   Backend Node.js
-├── DocumentosFuente/           Requisitos originales
-├── EMPIEZAAQUI.md               Orden mínimo para publicar
-├── AjustesJustosYNecesarios.md Correcciones aplicadas y requisitos afectados
-├── ProveedoresElegidos.md      Servicios definidos para el despliegue
-├── GuiaDespliegueRender.md     Publicación completa paso a paso
-├── GuiaDemostracion.md         Recorrido para la exposición
-├── InformeVerificacion.md      Pruebas ejecutadas
-├── render.yaml                 Configuración automática de Render
-└── docker-compose.opcional.yml Ejecución local opcional
+sgl_flujo_corregido
 ```
 
-## Inicio local sin Docker
-
-Requiere Node.js 22, npm y PostgreSQL 16 o compatible.
-
-1. Cree una base de datos local llamada `sgl`.
-2. Copie `Servidor/.env.ejemplo` como `Servidor/.env`.
-3. Revise `URL_BASE_DATOS` en `Servidor/.env`.
-4. Copie `Cliente/.env.ejemplo` como `Cliente/.env`.
-5. Ejecute desde la raíz:
-
-```bash
-npm run instalar
-npm --prefix Servidor run preparar
-npm run desarrollo
-```
-
-6. Abra `http://localhost:5173`.
-7. Compruebe `http://localhost:3000/api/health`.
-
-## Inicio local con Docker
-
-Docker es opcional y no se usa en el despliegue recomendado:
-
-```bash
-cp Servidor/.env.ejemplo Servidor/.env
-docker compose -f docker-compose.opcional.yml up --build
-```
-
-La interfaz quedará en `http://localhost:8080`.
+Por ello puede reutilizar la misma URL de Neon sin mezclar ni borrar las tablas anteriores.
 
 ## Usuarios iniciales
 
 | Rol | Correo | Contraseña |
 |---|---|---|
-| Super administrador | `superadmin@sgl.muni.pe` | `SuperAdmin123!` |
-| Administrador | `admin@trujillo.pe` | `Admin@123` |
-| Inspector | `inspector1@municipalidad.pe` | `inspector123` |
-| Cajera | `cajera1@municipalidad.pe` | `cajera123` |
+| SuperAdministrador | superadmin@sgl.pe | SuperAdmin123! |
+| Administrador | admin@sgl.pe | Admin123! |
+| Inspector | inspector@sgl.pe | Inspector123! |
+| Cajero 1 | cajero1@sgl.pe | Cajero123! |
+| Cajero 2 | cajero2@sgl.pe | Cajero123! |
 
-## Datos de respaldo para demostración
+## Datos de demostración
 
-- RUC válido de Trujillo: `20481234567`.
-- RUC activo fuera de Trujillo: `20503856674`.
-- DNI adulto: `71234567` o `72345678`.
-- DNI menor de edad: `73456789`.
+- RUC con un local: `20481234567`
+- RUC con dos locales válidos: `20601234567`
+- DNI adulto: `71234567`
+- DNI menor: `73456789`
 
-Cuando `CODART_TOKEN` está configurado, el sistema consulta primero CODART. Los registros locales solo se usan cuando no existe token y `MODO_DEMOSTRACION=true`.
+Estos registros siguen disponibles en modo demostración aunque CODART tenga un token real.
 
-## Comandos útiles
+## Verificación ejecutada
 
-```bash
-npm run probar
-npm run construir
-npm --prefix Servidor run respaldo
-npm --prefix Servidor run escenarioPrimeraVisita
-npm --prefix Servidor run escenarioSegundaVisita
-```
+- 6 pruebas de reglas del servidor.
+- 1 prueba del cliente API.
+- Compilación de producción de React.
+- Comprobación de importación del servidor.
+- Comprobación de servicio estático con respuesta HTTP 200.
+- Validación sintáctica de las 14 tablas PostgreSQL mediante un motor PostgreSQL embebido.
 
-Los dos últimos comandos preparan una exposición sin alterar las reglas productivas de 15 y 30 días.
+## Aclaración tributaria
 
-## Archivos y saltos de línea
-
-Los archivos de texto terminan con exactamente un salto de línea. Es una convención estándar que evita advertencias de Git y no crea una línea funcional adicional. No se dejaron bloques de líneas vacías al final.
+La factura y la boleta generadas son documentos académicos demostrativos con campos de referencia. No constituyen comprobantes electrónicos emitidos o autorizados por SUNAT.

@@ -4,35 +4,23 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
-  servidor:
+  verificar:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: Servidor
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: Servidor/.node-version
+          node-version: 22
           cache: npm
-          cache-dependency-path: Servidor/package-lock.json
-      - run: npm ci
-      - run: npm test
-
-  cliente:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: Cliente
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: Cliente/.node-version
-          cache: npm
-          cache-dependency-path: Cliente/package-lock.json
-      - run: npm ci
-      - run: npm test
+          cache-dependency-path: |
+            package-lock.json
+            Servidor/package-lock.json
+            Cliente/package-lock.json
+      - run: npm ci --include=dev
+      - run: npm --prefix Servidor ci
+      - run: npm --prefix Cliente ci
+      - run: npm run probar
       - run: npm run construir

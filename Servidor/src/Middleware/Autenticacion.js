@@ -1,64 +1,26 @@
-// Valida la sesión y el rol antes de continuar.
-
 import jwt from "jsonwebtoken";
-import { ConfiguracionEntorno } from "../Configuracion/ConfiguracionEntorno.js";
-import { ErrorNoAutorizado } from "../Dominio/Errores.js";
-// Rechaza peticiones sin un token válido.
-export function CrearMiddlewareAutenticacion(RepositorioUsuarios) {
-  return async function Autenticar(Solicitud, Respuesta, Siguiente) {
-    try {
-      const Encabezado = Solicitud.headers.authorization || "";
-      const Token = Encabezado.startsWith("Bearer ")
-        ? Encabezado.slice(7)
-        : null;
-      if (!Token)
-        throw new ErrorNoAutorizado("Debe iniciar sesión para continuar.");
-      const Carga = jwt.verify(Token, ConfiguracionEntorno.ClaveJwt, {
-        issuer: "sgl-trujillo",
-      });
-      const Usuario = await RepositorioUsuarios.BuscarPorId(Carga.Id);
-      if (!Usuario || !Usuario.habilitado)
-        throw new ErrorNoAutorizado(
-          "La sesión no es válida o el usuario está deshabilitado.",
-        );
-      Solicitud.Usuario = Usuario;
-      Siguiente();
-    } catch (Error) {
-      if (
-        Error.name === "JsonWebTokenError" ||
-        Error.name === "TokenExpiredError"
-      )
-        return Siguiente(
-          new ErrorNoAutorizado("La sesión venció. Inicie sesión nuevamente."),
-        );
-      Siguiente(Error);
-    }
-  };
+import { Configuracion } from "../Configuracion/Configuracion.js";
+import { ErrorAplicacion } from "../Dominio/ErrorAplicacion.js";
+
+export function Autenticar(Requerimiento, Respuesta, Siguiente) {
+  const Encabezado = Requerimiento.headers.authorization || "";
+  const Token = Encabezado.startsWith("Bearer ") ? Encabezado.slice(7) : "";
+  if (!Token) {
+    return Siguiente(new ErrorAplicacion("Debes iniciar sesión.", "NO_AUTENTICADO", 401));
+  }
+  try {
+    Requerimiento.Usuario = jwt.verify(Token, Configuracion.ClaveJwt);
+    Siguiente();
+  } catch {
+    Siguiente(new ErrorAplicacion("La sesión venció o no es válida.", "SESION_INVALIDA", 401));
+  }
 }
-export function CrearMiddlewareAutenticacionOpcional(RepositorioUsuarios) {
-  return async function AutenticarOpcional(Solicitud, Respuesta, Siguiente) {
-    try {
-      const E = Solicitud.headers.authorization || "";
-      const Token = E.startsWith("Bearer ") ? E.slice(7) : null;
-      if (!Token) return Siguiente();
-      const C = jwt.verify(Token, ConfiguracionEntorno.ClaveJwt, {
-        issuer: "sgl-trujillo",
-      });
-      const U = await RepositorioUsuarios.BuscarPorId(C.Id);
-      if (U?.habilitado) Solicitud.Usuario = U;
-      Siguiente();
-    } catch {
-      Siguiente();
+
+export function Autorizar(...Roles) {
+  return (Requerimiento, Respuesta, Siguiente) => {
+    if (!Requerimiento.Usuario || !Roles.includes(Requerimiento.Usuario.Rol)) {
+      return Siguiente(new ErrorAplicacion("No tienes permiso para esta operación.", "SIN_PERMISO", 403));
     }
-  };
-}
-// Comprueba el rol después de validar la sesión.
-export function AutorizarRoles(...Roles) {
-  return function Autorizar(Solicitud, Respuesta, Siguiente) {
-    if (!Solicitud.Usuario || !Roles.includes(Solicitud.Usuario.rol))
-      return Siguiente(
-        new ErrorNoAutorizado("Su rol no permite realizar esta acción."),
-      );
     Siguiente();
   };
 }

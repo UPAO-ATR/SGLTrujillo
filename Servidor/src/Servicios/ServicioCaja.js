@@ -1,269 +1,149 @@
-// Aplica las reglas de apertura, cobro, arqueo y cierre de caja.
+import { Consultar, Transaccion, Uno } from "../BaseDatos/Conexion.js";
+import { EstadosCaja, TiposSolicitudCaja } from "../Dominio/Constantes.js";
+import { ErrorAplicacion } from "../Dominio/ErrorAplicacion.js";
+import { Auditar } from "./ServicioAuditoria.js";
 
-import { Constantes } from "../Configuracion/Constantes.js";
-import { MediosPagoCajera } from "../Dominio/MediosPago.js";
-import { ErrorAplicacion, ErrorConflicto } from "../Dominio/Errores.js";
-import { AhoraPeru } from "../Utilidades/Fechas.js";
-// Suma el fondo y las ventas, luego descuenta las sangrías.
-export function CalcularEfectivoEsperado(
-  FondoInicial,
-  VentasEfectivo,
-  Sangrias,
-) {
-  return Number(FondoInicial) + Number(VentasEfectivo) - Number(Sangrias);
-}
 export class ServicioCaja {
-  constructor(Dependencias) {
-    Object.assign(this, Dependencias);
+  constructor(Tiempo) {
+    this.Tiempo = Tiempo;
   }
-  async ObtenerCajaActual(CajeraId) {
-    const Caja = await this.RepositorioCaja.BuscarCajaDelDia(
-      CajeraId,
-      AhoraPeru().toISODate(),
+
+  async Actual(CajeroId) {
+    const Fecha = await this.Tiempo.ObtenerFecha();
+    const Caja = await Uno(
+      `SELECT c.*, u.nombre cajero_nombre
+       FROM cajas c
+       JOIN usuarios u ON u.id=c.cajero_id
+       WHERE c.cajero_id=$1 AND c.fecha_operacion=$2
+       ORDER BY c.id DESC
+       LIMIT 1`,
+      [CajeroId, Fecha]
     );
-    return Caja ? this.CompletarCaja(Caja) : null;
-  }
-  // Permite una sola apertura diaria con el fondo obligatorio.
-  async AbrirCaja(CajeraId, FondoInicial, Usuario) {
-    if (Number(FondoInicial) !== Constantes.FondoInicialCaja)
-      throw new ErrorAplicacion(
-        `La jornada debe iniciar con un fondo fijo de S/ ${Constantes.FondoInicialCaja.toFixed(2)}.`,
-        "FONDO_INVALIDO",
-        400,
-      );
-    const Fecha = AhoraPeru().toISODate();
-    if (await this.RepositorioCaja.BuscarCajaDelDia(CajeraId, Fecha))
-      throw new ErrorConflicto("La caja de hoy ya fue abierta.");
-    const Caja = await this.RepositorioCaja.Abrir(
-      CajeraId,
+    const Solicitudes = await Consultar(
+      "SELECT * FROM solicitudes_caja WHERE cajero_id=$1 AND estado='PENDIENTE' ORDER BY id DESC",
+      [CajeroId]
+    );
+    const Movimientos = Caja
+      ? await Consultar(
+          "SELECT * FROM movimientos_caja WHERE caja_id=$1 ORDER BY id DESC LIMIT 20",
+          [Caja.id]
+        )
+      : { rows: [] };
+    return {
       Fecha,
-      FondoInicial,
-    );
-    await this.ServicioAuditoria.Registrar(
-      Usuario,
-      "ABRIR_CAJA",
-      "CAJA",
-      Caja.id,
-      { FondoInicial },
-    );
-    return this.CompletarCaja(Caja);
-  }
-  // Registra un pago solo cuando la caja está habilitada.
-  async RegistrarTransaccion(CajeraId, Datos, Usuario) {
-    if (!MediosPagoCajera.includes(Datos.MedioPago))
-      throw new ErrorAplicacion(
-        "La cajera solo puede registrar Yape, Plin o efectivo.",
-        "MEDIO_PAGO_INVALIDO",
-        400,
-      );
-    const Caja = await this.ObtenerCajaActual(CajeraId);
-    if (!Caja || Caja.estado !== "ABIERTA")
-      throw new ErrorAplicacion(
-        "Debe abrir la caja antes de registrar pagos.",
-        "CAJA_CERRADA",
-        409,
-      );
-    if (Datos.MedioPago === "EFECTIVO" && Caja.RequiereSangria)
-      throw new ErrorAplicacion(
-        "Debe registrar una sangría antes de continuar con pagos en efectivo.",
-        "SANGRIA_OBLIGATORIA",
-        409,
-      );
-    const Solicitud = Datos.SolicitudId
-      ? await this.RepositorioSolicitudes.BuscarPorId(Datos.SolicitudId)
-      : null;
-    if (Datos.SolicitudId && !Solicitud)
-      throw new ErrorAplicacion(
-        "La solicitud asociada no existe.",
-        "SOLICITUD_NO_EXISTE",
-        404,
-      );
-    const Pago = Datos.PagoId
-      ? await this.RepositorioPagos.BuscarPorId(Datos.PagoId)
-      : null;
-    if (Datos.PagoId && !Pago)
-      throw new ErrorAplicacion(
-        "El pago asociado no existe.",
-        "PAGO_NO_EXISTE",
-        404,
-      );
-    if (Pago && Pago.estado !== "CONFIRMADO")
-      throw new ErrorAplicacion(
-        "El pago debe estar confirmado antes de registrarlo en caja.",
-        "PAGO_NO_CONFIRMADO",
-        409,
-      );
-    if (
-      Pago &&
-      Datos.SolicitudId &&
-      Number(Pago.solicitud_id) !== Number(Datos.SolicitudId)
-    )
-      throw new ErrorAplicacion(
-        "El pago no pertenece a la solicitud indicada.",
-        "PAGO_SOLICITUD_INVALIDO",
-        400,
-      );
-    if (
-      Datos.PagoId &&
-      (await this.RepositorioCaja.BuscarTransaccionPorPago(Datos.PagoId))
-    )
-      throw new ErrorConflicto("El pago ya fue registrado en la caja diaria.");
-    const Transaccion = await this.RepositorioCaja.RegistrarTransaccion({
-      CajaId: Caja.id,
-      ...Datos,
-    });
-    await this.ServicioAuditoria.Registrar(
-      Usuario,
-      "REGISTRAR_PAGO_CAJA",
-      "TRANSACCION_CAJA",
-      Transaccion.id,
-      Datos,
-    );
-    return { Transaccion, Caja: await this.ObtenerCajaActual(CajeraId) };
-  }
-  // Retira efectivo sin modificar el total de ventas.
-  async RegistrarSangria(CajeraId, Monto, Motivo, Usuario) {
-    const Caja = await this.ObtenerCajaActual(CajeraId);
-    if (!Caja || Caja.estado !== "ABIERTA")
-      throw new ErrorAplicacion(
-        "La caja no se encuentra abierta.",
-        "CAJA_CERRADA",
-        409,
-      );
-    const Disponible = CalcularEfectivoEsperado(
-      Caja.fondo_inicial,
-      Caja.Totales.efectivo,
-      Caja.Totales.sangrias,
-    );
-    if (Number(Monto) > Disponible)
-      throw new ErrorAplicacion(
-        "La sangría no puede superar el efectivo disponible.",
-        "SANGRIA_EXCESIVA",
-        400,
-      );
-    const Sangria = await this.RepositorioCaja.RegistrarSangria({
-      CajaId: Caja.id,
-      Monto,
-      Motivo,
-    });
-    await this.ServicioAuditoria.Registrar(
-      Usuario,
-      "REGISTRAR_SANGRIA",
-      "SANGRIA",
-      Sangria.id,
-      { Monto, Motivo },
-    );
-    return { Sangria, Caja: await this.ObtenerCajaActual(CajeraId) };
-  }
-  // Compara el efectivo contado con el efectivo esperado.
-  async RealizarArqueo(CajeraId, EfectivoFisico, Usuario) {
-    const Caja = await this.ObtenerCajaActual(CajeraId);
-    if (!Caja || Caja.estado !== "ABIERTA")
-      throw new ErrorAplicacion(
-        "La caja no se encuentra abierta.",
-        "CAJA_CERRADA",
-        409,
-      );
-    const Esperado = CalcularEfectivoEsperado(
-      Caja.fondo_inicial,
-      Caja.Totales.efectivo,
-      Caja.Totales.sangrias,
-    );
-    const Diferencia = Number(EfectivoFisico) - Esperado;
-    await this.ServicioAuditoria.Registrar(
-      Usuario,
-      "REALIZAR_ARQUEO",
-      "CAJA",
-      Caja.id,
-      { EfectivoFisico, Esperado, Diferencia },
-    );
-    if (Math.abs(Diferencia) >= 0.01) {
-      const AlertaExistente =
-        await this.RepositorioAlertas.BuscarDescuadrePendiente(Caja.id);
-      if (!AlertaExistente) {
-        const NombreCajera =
-          `${Usuario?.nombres || "Cajera"} ${Usuario?.apellido_paterno || ""}`.trim();
-        await this.RepositorioAlertas.Crear({
-          CajeraId,
-          CajaId: Caja.id,
-          Tipo: "DESCUADRE_CAJA",
-          Mensaje: `${NombreCajera} presenta un descuadre de caja de S/ ${Diferencia.toFixed(2)}.`,
-          Detalles: { EfectivoFisico, Esperado, Diferencia },
-        });
-      }
-    }
-    return {
-      EfectivoFisico: Number(EfectivoFisico),
-      EfectivoEsperado: Esperado,
-      Diferencia,
-      Cuadra: Math.abs(Diferencia) < 0.01,
+      Caja,
+      Solicitudes: Solicitudes.rows,
+      Movimientos: Movimientos.rows
     };
   }
-  // Impide cerrar mientras exista cualquier descuadre.
-  async CerrarCaja(CajeraId, EfectivoFisico, Usuario) {
-    const Caja = await this.ObtenerCajaActual(CajeraId);
-    if (!Caja || Caja.estado !== "ABIERTA")
+
+  async SolicitarApertura(CajeroId) {
+    const Fecha = await this.Tiempo.ObtenerFecha();
+    const Existente = await Uno(
+      "SELECT * FROM cajas WHERE cajero_id=$1 AND fecha_operacion=$2",
+      [CajeroId, Fecha]
+    );
+    if (Existente && Existente.estado !== "RECHAZADA") {
       throw new ErrorAplicacion(
-        "La caja no se encuentra abierta.",
-        "CAJA_CERRADA",
-        409,
-      );
-    const Arqueo = await this.RealizarArqueo(CajeraId, EfectivoFisico, Usuario);
-    if (!Arqueo.Cuadra) {
-      await this.ServicioAuditoria.Registrar(
-        Usuario,
-        "DESCUADRE_CAJA",
-        "CAJA",
-        Caja.id,
-        Arqueo,
-      );
-      throw new ErrorAplicacion(
-        `No puede cerrar la caja. Existe un descuadre de S/ ${Arqueo.Diferencia.toFixed(2)}.`,
-        "DESCUADRE_CAJA",
-        409,
-        Arqueo,
+        "Ya existe una caja o solicitud para la fecha actual.",
+        "CAJA_EXISTENTE",
+        409
       );
     }
-    const Cerrada = await this.RepositorioCaja.Cerrar(
-      Caja.id,
-      Arqueo.EfectivoFisico,
-      Arqueo.EfectivoEsperado,
-      Arqueo.Diferencia,
-    );
-    await this.ServicioAuditoria.Registrar(
-      Usuario,
-      "CERRAR_CAJA",
-      "CAJA",
-      Caja.id,
-      Arqueo,
-    );
-    return Cerrada;
+    const Resultado = await Transaccion(async (Cliente) => {
+      const Caja = Existente
+        ? await Cliente.query(
+            "UPDATE cajas SET estado=$2, monto_inicial=0, efectivo_esperado=0, efectivo_contado=NULL, diferencia=NULL WHERE id=$1 RETURNING *",
+            [Existente.id, EstadosCaja.SOLICITADA_APERTURA]
+          )
+        : await Cliente.query(
+            "INSERT INTO cajas(cajero_id, fecha_operacion, estado) VALUES($1,$2,$3) RETURNING *",
+            [CajeroId, Fecha, EstadosCaja.SOLICITADA_APERTURA]
+          );
+      const Solicitud = await Cliente.query(
+        "INSERT INTO solicitudes_caja(caja_id, cajero_id, tipo, detalle) VALUES($1,$2,$3,$4) RETURNING *",
+        [
+          Caja.rows[0].id,
+          CajeroId,
+          TiposSolicitudCaja.APERTURA,
+          "Solicitud de apertura de caja"
+        ]
+      );
+      return { Caja: Caja.rows[0], Solicitud: Solicitud.rows[0] };
+    });
+    await Auditar(CajeroId, "SOLICITAR_APERTURA", "CAJA", Resultado.Caja.id);
+    return Resultado.Solicitud;
   }
-  // Calcula totales y determina si la sangría es obligatoria.
-  async CompletarCaja(Caja) {
-    const Totales = await this.RepositorioCaja.ObtenerTotales(Caja.id);
-    const Umbral = Number(
-      await this.RepositorioConfiguracion.ObtenerValor(
-        "UmbralSangria",
-        Constantes.UmbralSangriaPredeterminado,
-      ),
+
+  async SolicitarInyeccion(CajeroId, Monto) {
+    const Caja = await this.CajaAbierta(CajeroId);
+    if (!Number.isFinite(Monto) || !(Monto > 0)) {
+      throw new ErrorAplicacion(
+        "El monto de inyección debe ser mayor que cero.",
+        "MONTO_INVALIDO"
+      );
+    }
+    const Resultado = await Consultar(
+      "INSERT INTO solicitudes_caja(caja_id, cajero_id, tipo, monto, detalle) VALUES($1,$2,'INYECCION',$3,$4) RETURNING *",
+      [Caja.id, CajeroId, Monto, "Solicitud de sencillo adicional"]
     );
-    const Datos = {
-      efectivo: Number(Totales.efectivo),
-      yape: Number(Totales.yape),
-      plin: Number(Totales.plin),
-      sangrias: Number(Totales.sangrias),
-    };
-    return {
-      ...Caja,
-      Totales: Datos,
-      EfectivoEnRegistradora: CalcularEfectivoEsperado(
-        Caja.fondo_inicial,
-        Datos.efectivo,
-        Datos.sangrias,
-      ),
-      UmbralSangria: Umbral,
-      RequiereSangria: Datos.efectivo - Datos.sangrias >= Umbral,
-    };
+    await Auditar(CajeroId, "SOLICITAR_INYECCION", "CAJA", Caja.id, { Monto });
+    return Resultado.rows[0];
+  }
+
+  async SolicitarCierre(CajeroId, MontoContado) {
+    const Caja = await this.CajaAbierta(CajeroId);
+    if (!Number.isFinite(MontoContado) || MontoContado < 0) {
+      throw new ErrorAplicacion(
+        "El monto contado no puede ser negativo.",
+        "MONTO_INVALIDO"
+      );
+    }
+    await Consultar(
+      "UPDATE cajas SET estado='SOLICITADA_CIERRE', efectivo_contado=$2 WHERE id=$1",
+      [Caja.id, MontoContado]
+    );
+    const Resultado = await Consultar(
+      "INSERT INTO solicitudes_caja(caja_id, cajero_id, tipo, monto_contado, detalle) VALUES($1,$2,'CIERRE',$3,$4) RETURNING *",
+      [Caja.id, CajeroId, MontoContado, "Solicitud de cierre y arqueo"]
+    );
+    await Auditar(CajeroId, "SOLICITAR_CIERRE", "CAJA", Caja.id, {
+      MontoContado
+    });
+    return Resultado.rows[0];
+  }
+
+  async CajaAbierta(CajeroId, Cliente = null) {
+    const Fecha = await this.Tiempo.ObtenerFecha();
+    const Resultado = Cliente
+      ? await Cliente.query(
+          "SELECT * FROM cajas WHERE cajero_id=$1 AND fecha_operacion=$2 AND estado='ABIERTA'",
+          [CajeroId, Fecha]
+        )
+      : await Consultar(
+          "SELECT * FROM cajas WHERE cajero_id=$1 AND fecha_operacion=$2 AND estado='ABIERTA'",
+          [CajeroId, Fecha]
+        );
+    const Caja = Resultado.rows[0];
+    if (!Caja) {
+      throw new ErrorAplicacion(
+        "Debes tener una caja abierta y autorizada para continuar.",
+        "CAJA_NO_ABIERTA",
+        409
+      );
+    }
+    return Caja;
+  }
+
+  async RegistrarCobroEfectivo(CajaId, Monto, Referencia, Cliente) {
+    if (Monto <= 0) return;
+    await Cliente.query(
+      "UPDATE cajas SET efectivo_esperado=efectivo_esperado+$2 WHERE id=$1",
+      [CajaId, Monto]
+    );
+    await Cliente.query(
+      "INSERT INTO movimientos_caja(caja_id, tipo, monto, detalle, referencia) VALUES($1,'COBRO_EFECTIVO',$2,$3,$4)",
+      [CajaId, Monto, "Cobro de trámite", Referencia]
+    );
   }
 }

@@ -1,42 +1,37 @@
-// Centraliza cálculos de fechas en la zona horaria del Perú.
-
 import { DateTime } from "luxon";
-import { ConfiguracionEntorno } from "../Configuracion/ConfiguracionEntorno.js";
-// Obtiene la fecha actual en la zona horaria oficial.
-export function AhoraPeru() {
-  return DateTime.now().setZone(ConfiguracionEntorno.ZonaHoraria);
+import { Configuracion } from "../Configuracion/Configuracion.js";
+
+export function FechaReal() {
+  return DateTime.now().setZone(Configuracion.ZonaHoraria).toISODate();
 }
-export function FechaPeruDesdeIso(Valor) {
-  if (DateTime.isDateTime(Valor))
-    return Valor.setZone(ConfiguracionEntorno.ZonaHoraria);
-  if (Valor instanceof Date)
-    return DateTime.fromJSDate(Valor, {
-      zone: ConfiguracionEntorno.ZonaHoraria,
-    });
-  return DateTime.fromISO(String(Valor), {
-    zone: ConfiguracionEntorno.ZonaHoraria,
-  });
+
+export function FechaValida(Fecha) {
+  const Valor = DateTime.fromISO(String(Fecha), { zone: Configuracion.ZonaHoraria });
+  return Valor.isValid && /^\d{4}-\d{2}-\d{2}$/.test(String(Fecha));
 }
-export function SumarDiasCalendario(Fecha, Dias) {
-  return FechaPeruDesdeIso(Fecha).plus({ days: Dias }).startOf("day");
+
+export function FormatearFecha(Fecha) {
+  return DateTime.fromISO(String(Fecha), { zone: Configuracion.ZonaHoraria }).toFormat("dd/MM/yyyy");
 }
-export function EsFinDeSemana(Fecha) {
-  return Fecha.weekday === 6 || Fecha.weekday === 7;
+
+export function EsHabil(Fecha, Feriados = new Set()) {
+  const Dia = DateTime.fromISO(String(Fecha), { zone: Configuracion.ZonaHoraria });
+  return Dia.weekday <= 5 && !Feriados.has(Dia.toISODate());
 }
-// Nunca devuelve una cantidad negativa de días.
-export function DiasRestantes(Fecha) {
-  const Diferencia = Math.ceil(
-    FechaPeruDesdeIso(Fecha)
-      .startOf("day")
-      .diff(AhoraPeru().startOf("day"), "days").days,
-  );
-  return Math.max(0, Diferencia);
+
+export function AgregarDiasHabiles(Fecha, Cantidad, Feriados = new Set()) {
+  let Actual = DateTime.fromISO(String(Fecha), { zone: Configuracion.ZonaHoraria });
+  let Contados = 0;
+  while (Contados < Cantidad) {
+    Actual = Actual.plus({ days: 1 });
+    if (Actual.weekday <= 5 && !Feriados.has(Actual.toISODate())) Contados += 1;
+  }
+  return Actual.toISODate();
 }
-export function CalcularEdad(FechaNacimiento) {
-  if (!FechaNacimiento) return null;
-  const Nacimiento = DateTime.fromISO(String(FechaNacimiento), {
-    zone: ConfiguracionEntorno.ZonaHoraria,
-  });
-  if (!Nacimiento.isValid) return null;
-  return Math.floor(AhoraPeru().diff(Nacimiento, "years").years);
+
+export function CalcularEdad(FechaNacimiento, FechaReferencia) {
+  const Nacimiento = DateTime.fromISO(String(FechaNacimiento));
+  const Referencia = DateTime.fromISO(String(FechaReferencia));
+  if (!Nacimiento.isValid || !Referencia.isValid) return null;
+  return Math.floor(Referencia.diff(Nacimiento, "years").years);
 }

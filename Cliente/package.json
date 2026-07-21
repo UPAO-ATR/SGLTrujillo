@@ -1,25 +1,22 @@
 {
-  "name": "cliente-sgl-literal",
-  "version": "1.0.0",
+  "name": "cliente-sgl-flujo-corregido",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "desarrollo": "vite",
+    "desarrollo": "vite --host 0.0.0.0",
     "construir": "vite build",
-    "vistaPrevia": "vite preview --host 0.0.0.0",
-    "test": "vitest run --pool=forks --maxWorkers=1"
+    "test": "vitest run"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.14",
-    "lucide-react": "^0.468.0",
+    "@vitejs/plugin-react": "^5.0.2",
+    "vite": "^7.1.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.1",
-    "tailwindcss": "^4.1.14"
+    "react-router-dom": "^7.8.2",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^5.0.4",
-    "vite": "^7.1.7",
     "vitest": "^3.2.4"
   }
 }

@@ -1,15 +1,14 @@
-// Dirige al usuario al panel correspondiente a su rol.
-
-import { Navigate } from "react-router-dom";
-import { UsarAutenticacion } from "../Contextos/ContextoAutenticacion.jsx";
+import { useAutenticacion } from "../Contextos/ContextoAutenticacion.jsx";
+import PaginaCajero from "./PaginaCajero.jsx";
+import PaginaInspector from "./PaginaInspector.jsx";
+import PaginaAdministrador from "./PaginaAdministrador.jsx";
+import PaginaSuperAdministrador from "./PaginaSuperAdministrador.jsx";
 
 export default function PaginaPanel() {
-  const { Usuario } = UsarAutenticacion();
-  const Rutas = {
-    INSPECTOR: "/panel/inspector",
-    CAJERA: "/panel/cajera",
-    ADMINISTRADOR: "/panel/administrador",
-    SUPER_ADMINISTRADOR: "/panel/superAdministrador",
-  };
-  return <Navigate to={Rutas[Usuario?.rol] || "/"} replace />;
+  const { Usuario } = useAutenticacion();
+  if (Usuario.Rol === "CAJERO") return <PaginaCajero />;
+  if (Usuario.Rol === "INSPECTOR") return <PaginaInspector />;
+  if (Usuario.Rol === "ADMINISTRADOR") return <PaginaAdministrador />;
+  if (Usuario.Rol === "SUPERADMINISTRADOR") return <PaginaSuperAdministrador />;
+  return <p>Rol no reconocido.</p>;
 }

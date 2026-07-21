@@ -1,55 +1,28 @@
-// Proporciona datos controlados cuando el modo demostración está activo.
-
-export const RucsDemostracion = Object.freeze({
-  20481234567: {
+export const RucsDemostracion = {
+  "20481234567": {
     Ruc: "20481234567",
     RazonSocial: "COMERCIAL TRUJILLO DEMOSTRACION S.A.C.",
     Estado: "ACTIVO",
     Condicion: "HABIDO",
-    DomicilioFiscal: "AV. ESPAÑA NRO. 1234 TRUJILLO",
-    Ubigeo: "130101",
-    Distrito: "TRUJILLO",
-    Provincia: "TRUJILLO",
-    Departamento: "LA LIBERTAD",
+    Locales: [
+      { Codigo: "PRINCIPAL", Tipo: "LOCAL PRINCIPAL", Direccion: "AV. ESPAÑA 1234, TRUJILLO", Ubigeo: "130101", Activo: true }
+    ]
   },
-  20503856674: {
-    Ruc: "20503856674",
-    RazonSocial: "NEGOCIO FUERA DE TRUJILLO S.A.C.",
+  "20601234567": {
+    Ruc: "20601234567",
+    RazonSocial: "NEGOCIOS MÚLTIPLES TRUJILLO S.A.C.",
     Estado: "ACTIVO",
     Condicion: "HABIDO",
-    DomicilioFiscal: "AV. GRAL. GARZON NRO. 2320",
-    Ubigeo: "150113",
-    Distrito: "JESUS MARIA",
-    Provincia: "LIMA",
-    Departamento: "LIMA",
-  },
-});
-export const DnisDemostracion = Object.freeze({
-  71234567: {
-    Dni: "71234567",
-    Nombres: "MARIO ANDRES",
-    ApellidoPaterno: "QUISPE",
-    ApellidoMaterno: "MENDOZA",
-    NombreCompleto: "QUISPE MENDOZA MARIO ANDRES",
-    FechaNacimiento: "1992-06-15",
-    Edad: 34,
-  },
-  72345678: {
-    Dni: "72345678",
-    Nombres: "LUCIA ELENA",
-    ApellidoPaterno: "RAMIREZ",
-    ApellidoMaterno: "TORRES",
-    NombreCompleto: "RAMIREZ TORRES LUCIA ELENA",
-    FechaNacimiento: "1997-03-20",
-    Edad: 29,
-  },
-  73456789: {
-    Dni: "73456789",
-    Nombres: "CARLOS JOSE",
-    ApellidoPaterno: "QUISPE",
-    ApellidoMaterno: "MENDOZA",
-    NombreCompleto: "QUISPE MENDOZA CARLOS JOSE",
-    FechaNacimiento: "2009-01-10",
-    Edad: 17,
-  },
-});
+    Locales: [
+      { Codigo: "PRINCIPAL", Tipo: "LOCAL PRINCIPAL", Direccion: "JR. PIZARRO 450, TRUJILLO", Ubigeo: "130101", Activo: true },
+      { Codigo: "ANEXO-001", Tipo: "LOCAL ANEXO", Direccion: "AV. AMÉRICA SUR 1800, TRUJILLO", Ubigeo: "130101", Activo: true },
+      { Codigo: "ANEXO-002", Tipo: "LOCAL ANEXO", Direccion: "AV. LARCO 900, VÍCTOR LARCO", Ubigeo: "130111", Activo: true }
+    ]
+  }
+};
+
+export const DnisDemostracion = {
+  "71234567": { Dni: "71234567", NombreCompleto: "QUISPE MENDOZA MARIO ANDRÉS", FechaNacimiento: "1992-06-15" },
+  "72345678": { Dni: "72345678", NombreCompleto: "RAMÍREZ TORRES LUCÍA ELENA", FechaNacimiento: "1997-03-20" },
+  "73456789": { Dni: "73456789", NombreCompleto: "QUISPE MENDOZA CARLOS JOSÉ", FechaNacimiento: "2009-01-10" }
+};

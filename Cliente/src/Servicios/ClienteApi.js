@@ -1,54 +1,31 @@
-// Centraliza las peticiones HTTP y el manejo común de respuestas.
+const Base = "/api";
 
-import { ConfiguracionAplicacion } from "../Configuracion/ConfiguracionAplicacion.js";
-
-function ObtenerToken() {
-  return localStorage.getItem("TokenSgl") || "";
-}
-
-function CrearEncabezados(EsFormulario) {
-  const Encabezados = {};
-  const Token = ObtenerToken();
-
-  if (!EsFormulario) Encabezados["Content-Type"] = "application/json";
-  if (Token) Encabezados.Authorization = `Bearer ${Token}`;
-
-  return Encabezados;
-}
-
-async function InterpretarRespuesta(Respuesta) {
-  const TipoContenido = Respuesta.headers.get("content-type") || "";
-  const Cuerpo = TipoContenido.includes("application/json")
-    ? await Respuesta.json()
-    : await Respuesta.text();
-
+export async function Solicitar(Ruta, Opciones = {}) {
+  const Token = localStorage.getItem("SglToken");
+  const Encabezados = new Headers(Opciones.headers || {});
+  if (Token) Encabezados.set("Authorization", `Bearer ${Token}`);
+  if (Opciones.body && !(Opciones.body instanceof FormData)) Encabezados.set("Content-Type", "application/json");
+  const Respuesta = await fetch(`${Base}${Ruta}`, { ...Opciones, headers: Encabezados });
+  const Tipo = Respuesta.headers.get("content-type") || "";
   if (!Respuesta.ok) {
-    const Error = new Error(
-      Cuerpo?.Mensaje || "No se pudo completar la operación.",
-    );
-    Error.Codigo = Cuerpo?.Codigo || "ERROR_API";
-    Error.Detalles = Cuerpo?.Detalles || null;
-    Error.EstadoHttp = Respuesta.status;
-    throw Error;
+    const Cuerpo = Tipo.includes("application/json") ? await Respuesta.json() : {};
+    const ErrorApi = new Error(Cuerpo.Mensaje || "No se pudo completar la operación.");
+    ErrorApi.Codigo = Cuerpo.Codigo || "ERROR_API";
+    ErrorApi.EstadoHttp = Respuesta.status;
+    throw ErrorApi;
   }
-
-  return Cuerpo?.Datos ?? Cuerpo;
+  if (Tipo.includes("application/json")) return Respuesta.json();
+  return Respuesta.blob();
 }
 
-// Agrega el token y unifica los errores del servidor.
-export async function SolicitarApi(Ruta, Opciones = {}) {
-  const EsFormulario = Opciones.body instanceof FormData;
-  const Respuesta = await fetch(`${ConfiguracionAplicacion.UrlApi}${Ruta}`, {
-    ...Opciones,
-    headers: {
-      ...CrearEncabezados(EsFormulario),
-      ...(Opciones.headers || {}),
-    },
-  });
+export const Api = {
+  Get: (Ruta) => Solicitar(Ruta),
+  Post: (Ruta, Datos) => Solicitar(Ruta, { method: "POST", body: Datos instanceof FormData ? Datos : JSON.stringify(Datos || {}) }),
+  Put: (Ruta, Datos) => Solicitar(Ruta, { method: "PUT", body: JSON.stringify(Datos || {}) }),
+  Delete: (Ruta) => Solicitar(Ruta, { method: "DELETE" })
+};
 
-  return InterpretarRespuesta(Respuesta);
-}
-
-export function ObtenerUrlApi(Ruta) {
-  return `${ConfiguracionAplicacion.UrlApi}${Ruta}`;
+export async function AbrirArchivoProtegido(Ruta) {
+  const Blob = await Solicitar(Ruta);
+  window.open(URL.createObjectURL(Blob), "_blank", "noopener,noreferrer");
 }

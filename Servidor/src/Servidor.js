@@ -1,16 +1,13 @@
-// Inicia el servidor y las tareas programadas.
+import Aplicacion from "./Aplicacion.js";
+import { Configuracion, ValidarConfiguracion } from "./Configuracion/Configuracion.js";
 
-import { CrearAplicacion } from "./Aplicacion.js";
-import {
-  ConfiguracionEntorno,
-  ValidarConfiguracionMinima,
-} from "./Configuracion/ConfiguracionEntorno.js";
-import { IniciarTareasInspecciones } from "./Tareas/TareasInspecciones.js";
-ValidarConfiguracionMinima();
-const Aplicacion = CrearAplicacion();
-Aplicacion.listen(ConfiguracionEntorno.Puerto, () =>
-  console.log(
-    `SGL Trujillo disponible en el puerto ${ConfiguracionEntorno.Puerto}.`,
-  ),
-);
-IniciarTareasInspecciones();
+ValidarConfiguracion();
+const Servidor = Aplicacion.listen(Configuracion.Puerto, "0.0.0.0", () => {
+  console.log(`SGL Trujillo V2 disponible en el puerto ${Configuracion.Puerto}.`);
+});
+
+function Cerrar() {
+  Servidor.close(() => process.exit(0));
+}
+process.on("SIGTERM", Cerrar);
+process.on("SIGINT", Cerrar);
