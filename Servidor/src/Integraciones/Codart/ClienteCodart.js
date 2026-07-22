@@ -92,7 +92,7 @@ export class ClienteCodart {
     const Temporizador = setTimeout(() => Control.abort(), 10000);
     try {
       const Respuesta = await fetch(Url, {
-        headers: { Authorization: `Bearer ${Configuracion.CodartToken}`, Accept: "application/json" },
+        headers: { Authorization: `Bearer ${Configuracion.CodartToken}`, Accept: "application/json", "Content-Type": "application/json" },
         signal: Control.signal
       });
       const Cuerpo = await Respuesta.json().catch(() => null);
