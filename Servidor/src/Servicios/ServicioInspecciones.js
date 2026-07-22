@@ -14,20 +14,36 @@ export class ServicioInspecciones {
   async Hoy(InspectorId) {
     await this.Tiempo.ProcesarEventos();
     const Fecha = await this.Tiempo.ObtenerFecha();
+
+    const Reasignadas = await Consultar(
+      `UPDATE inspecciones
+       SET inspector_id=$1
+       WHERE fecha_programada=$2
+       AND estado='PENDIENTE'
+       AND inspector_id IS DISTINCT FROM $1
+       RETURNING id`,
+      [InspectorId, Fecha]
+    );
+
     const Resultado = await Consultar(
       `SELECT i.id,i.numero,i.fecha_programada,t.id tramite_id,
-              t.ruc,t.codigo,n.razon_social,l.direccion
+       t.ruc,t.codigo,n.razon_social,l.direccion
        FROM inspecciones i
        JOIN tramites t ON t.id=i.tramite_id
        JOIN negocios n ON n.id=t.negocio_id
        JOIN locales l ON l.id=t.local_id
        WHERE i.inspector_id=$1
-         AND i.fecha_programada=$2
-         AND i.estado='PENDIENTE'
+       AND i.fecha_programada=$2
+       AND i.estado='PENDIENTE'
        ORDER BY i.id
        LIMIT 4`,
       [InspectorId, Fecha]
     );
+
+    console.info(
+      `[INSPECTOR_HOY] inspector=${InspectorId} fecha=${Fecha} reasignadas=${Reasignadas.rowCount} visibles=${Resultado.rowCount}`
+    );
+
     return { Fecha, Inspecciones: Resultado.rows };
   }
 
