@@ -15,19 +15,7 @@ function PagoDemostrativo({ codigo, alPagar, bloqueado = false }) {
   const [Procesando, DefinirProcesando] = useState(false);
   const Total = Math.round((Numero(Efectivo) + Numero(Digital)) * 100) / 100;
   const Saldo = Math.round((3 - Total) * 100) / 100;
- useEffect(() => {
-  localStorage.removeItem(ClaveSimulacion);
-  DefinirPagoSimulado(false);
-
-  function ActualizarPago(Evento) {
-   if (!Evento || Evento.key === ClaveSimulacion) {
-    DefinirPagoSimulado(localStorage.getItem(ClaveSimulacion) === "1");
-   }
-  }
-
-  window.addEventListener("storage", ActualizarPago);
-  return () => window.removeEventListener("storage", ActualizarPago);
- }, [ClaveSimulacion]);
+ useEffect(() => { function ActualizarPago(Evento) { if (!Evento || Evento.key === ClaveSimulacion) { DefinirPagoSimulado(localStorage.getItem(ClaveSimulacion) === "1"); } } function AlEnfocar() { ActualizarPago(); } function AlCambiarVisibilidad() { if (!document.hidden) ActualizarPago(); } ActualizarPago(); window.addEventListener("storage", ActualizarPago); window.addEventListener("focus", AlEnfocar); document.addEventListener("visibilitychange", AlCambiarVisibilidad); const Intervalo = window.setInterval(AlEnfocar, 500); return () => { window.removeEventListener("storage", ActualizarPago); window.removeEventListener("focus", AlEnfocar); document.removeEventListener("visibilitychange", AlCambiarVisibilidad); window.clearInterval(Intervalo); }; }, [ClaveSimulacion]);
 
  function AbrirSimulador() {
   window.open(`/panel?simularPago=${encodeURIComponent(codigo || "TRAMITE")}`, "_blank", "noopener,noreferrer");
