@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import { Api, AbrirArchivoProtegido } from "../Servicios/ClienteApi.js";
 import { Area, Boton, Campo, EtiquetaEstado, Mensaje as Aviso, Seccion, Selector } from "../Componentes/Comunes.jsx";
 
@@ -11,20 +10,47 @@ function PagoDemostrativo({ codigo, alPagar, bloqueado = false }) {
   const [Digital, DefinirDigital] = useState("3");
   const [Medio, DefinirMedio] = useState("YAPE");
   const [Operacion, DefinirOperacion] = useState("");
-  const [Qr, DefinirQr] = useState("");
+  const [PagoSimulado, DefinirPagoSimulado] = useState(false);
+ const ClaveSimulacion = `SglPagoSimulado:${codigo || "TRAMITE"}`;
   const [Procesando, DefinirProcesando] = useState(false);
   const Total = Math.round((Numero(Efectivo) + Numero(Digital)) * 100) / 100;
   const Saldo = Math.round((3 - Total) * 100) / 100;
-  useEffect(() => {
-    if (Numero(Digital) <= 0) return DefinirQr("");
-    QRCode.toDataURL(`SGL TRUJILLO | ${codigo || "TRAMITE"} | ${Medio} | MONTO S/ ${Numero(Digital).toFixed(2)} | DEMOSTRACION ACADEMICA`, { width: 230, margin: 1 }).then(DefinirQr);
-  }, [Digital, Medio, codigo]);
+ useEffect(() => {
+  localStorage.removeItem(ClaveSimulacion);
+  DefinirPagoSimulado(false);
+
+  function ActualizarPago(Evento) {
+   if (!Evento || Evento.key === ClaveSimulacion) {
+    DefinirPagoSimulado(localStorage.getItem(ClaveSimulacion) === "1");
+   }
+  }
+
+  window.addEventListener("storage", ActualizarPago);
+  return () => window.removeEventListener("storage", ActualizarPago);
+ }, [ClaveSimulacion]);
+
+ function AbrirSimulador() {
+  window.open(`/panel?simularPago=${encodeURIComponent(codigo || "TRAMITE")}`, "_blank", "noopener,noreferrer");
+ }
   async function Confirmar() {
     DefinirProcesando(true);
     try { await alPagar({ montoEfectivo: Numero(Efectivo), montoDigital: Numero(Digital), medioDigital: Numero(Digital) > 0 ? Medio : null, numeroOperacion: Operacion }); }
     finally { DefinirProcesando(false); }
   }
-  return <div className="pago"><div className="resumen-pago"><div><span>Tasa oficial</span><b>S/ 180.00</b></div><div><span>Monto demostrativo</span><b>S/ 3.00</b></div><div><span>Total registrado</span><b>S/ {Total.toFixed(2)}</b></div><div><span>Saldo</span><b className={Saldo === 0 ? "texto-correcto" : "texto-error"}>S/ {Saldo.toFixed(2)}</b></div></div><div className="rejilla dos"><Campo etiqueta="Efectivo" type="number" step="0.01" min="0" max="3" value={Efectivo} onChange={(e) => DefinirEfectivo(e.target.value)} /><Campo etiqueta="Yape/Plin" type="number" step="0.01" min="0" max="3" value={Digital} onChange={(e) => DefinirDigital(e.target.value)} /></div>{Numero(Digital) > 0 && <div className="pago-digital"><div><Selector etiqueta="Medio digital" value={Medio} onChange={(e) => DefinirMedio(e.target.value)}><option value="YAPE">Yape</option><option value="PLIN">Plin</option></Selector><Campo etiqueta="Número de operación" value={Operacion} onChange={(e) => DefinirOperacion(e.target.value)} placeholder="Ej. 784512" /></div><div className="qr">{Qr && <img src={Qr} alt="QR demostrativo con monto" />}<small>QR dinámico demostrativo. La verificación es manual por el cajero.</small></div></div>}<Boton disabled={bloqueado || Procesando || Saldo !== 0 || (Numero(Digital) > 0 && Operacion.trim().length < 4)} onClick={Confirmar}>{Procesando ? "Registrando..." : "Confirmar pago recibido"}</Boton></div>;
+ return <div className="pago"><div className="resumen-pago"><div><span>Tasa oficial</span><b>S/ 180.00</b></div><div><span>Monto demostrativo</span><b>S/ 3.00</b></div><div><span>Total registrado</span><b>S/ {Total.toFixed(2)}</b></div><div><span>Saldo</span><b className={Saldo === 0 ? "texto-correcto" : "texto-error"}>S/ {Saldo.toFixed(2)}</b></div></div><div className="rejilla dos"><Campo etiqueta="Efectivo" type="number" step="0.01" min="0" max="3" value={Efectivo} onChange={(e) => DefinirEfectivo(e.target.value)} /><Campo etiqueta="Yape/Plin" type="number" step="0.01" min="0" max="3" value={Digital} onChange={(e) => DefinirDigital(e.target.value)} /></div>{Numero(Digital) > 0 && <div className="pago-digital"><div><Selector etiqueta="Medio digital" value={Medio} onChange={(e) => DefinirMedio(e.target.value)}><option value="YAPE">Yape</option><option value="PLIN">Plin</option></Selector><Campo etiqueta={"N\u00famero de operaci\u00f3n"} type="text" inputMode="numeric" maxLength={8} value={Operacion} onChange={(e) => DefinirOperacion(e.target.value.replace(/\D/g, "").slice(0, 8))} placeholder="Ej. 784512" /></div><div className="qr"><img src="/QRYapeSGL.png" alt="QR de Yape" /><small>QR de Yape. La verificaci\u00f3n es manual por el cajero.</small></div></div>}<Boton secundario onClick={AbrirSimulador}>D</Boton><Boton disabled={bloqueado || Procesando || !PagoSimulado || Saldo !== 0 || (Numero(Digital) > 0 && Operacion.trim().length === 0)} onClick={Confirmar}>{Procesando ? "Registrando..." : "Confirmar pago recibido"}</Boton></div>;
+}
+
+
+function SimuladorPago({ codigo }) {
+ const [Confirmado, DefinirConfirmado] = useState(false);
+ const Clave = `SglPagoSimulado:${codigo}`;
+
+ function Simular() {
+  localStorage.setItem(Clave, "1");
+  DefinirConfirmado(true);
+ }
+
+ return <div className="pagina"><Seccion titulo="Simulador de pago"><p>Tramite: <b>{codigo}</b></p><Boton onClick={Simular}>Simular pago recibido</Boton>{Confirmado && <Aviso tipo="exito">Pago simulado. Regresa a la pestana anterior.</Aviso>}</Seccion></div>;
 }
 
 function ModuloCaja({ alCambiar }) {
@@ -82,6 +108,7 @@ function Historial({ version }) {
 export default function PaginaCajero() {
   const [Pestana, DefinirPestana] = useState("solicitud");
   const [Version, DefinirVersion] = useState(0);
+ const CodigoSimulacion = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("simularPago");
+ if (CodigoSimulacion) return <SimuladorPago codigo={CodigoSimulacion} />;
   return <div className="pagina"><h1>Atención presencial de licencias</h1><p>La caja debe estar autorizada antes de registrar solicitudes o renovaciones.</p><ModuloCaja alCambiar={() => DefinirVersion((v) => v + 1)} /><div className="pestanas"><button className={Pestana === "solicitud" ? "activa" : ""} onClick={() => DefinirPestana("solicitud")}>Nueva solicitud</button><button className={Pestana === "renovacion" ? "activa" : ""} onClick={() => DefinirPestana("renovacion")}>Renovación</button><button className={Pestana === "historial" ? "activa" : ""} onClick={() => DefinirPestana("historial")}>Historial</button></div>{Pestana === "solicitud" && <NuevaSolicitud alCompletar={() => DefinirVersion((v) => v + 1)} />}{Pestana === "renovacion" && <Renovacion alCompletar={() => DefinirVersion((v) => v + 1)} />}{Pestana === "historial" && <Historial version={Version} />}</div>;
 }
-
