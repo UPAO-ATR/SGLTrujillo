@@ -38,7 +38,7 @@ export class ServicioAdministracion {
          FROM solicitudes_caja s
          LEFT JOIN cajas c ON c.id=s.caja_id
          WHERE s.id=$1
-         FOR UPDATE`,
+         FOR UPDATE OF s`,
         [SolicitudId]
       );
       const Solicitud = Consulta.rows[0];
