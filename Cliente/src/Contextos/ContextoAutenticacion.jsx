@@ -40,7 +40,7 @@ export function ProveedorAutenticacion({ children }) {
 
     if (!Token || !UsuarioNormalizado) {
       throw new globalThis.Error(
-        "El servidor respondiÃ³ sin una sesiÃ³n vÃ¡lida."
+        "El servidor respondió sin una sesión válida."
       );
     }
 
@@ -77,9 +77,10 @@ export function useAutenticacion() {
 
   if (!Valor) {
     throw new globalThis.Error(
-      "El contexto de autenticaciÃ³n no estÃ¡ disponible."
+      "El contexto de autenticación no está disponible."
     );
   }
 
   return Valor;
 }
+

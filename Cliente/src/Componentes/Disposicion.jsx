@@ -43,11 +43,11 @@ export function DisposicionPanel({ children }) {
 
         <nav>
           <NavLink to="/panel">Panel principal</NavLink>
-          <NavLink to="/seguimiento">Seguimiento pÃºblico</NavLink>
+          <NavLink to="/seguimiento">Seguimiento público</NavLink>
         </nav>
 
         <button type="button" onClick={CerrarSesion}>
-          Cerrar sesiÃ³n
+          Cerrar sesión
         </button>
       </aside>
 
@@ -59,3 +59,4 @@ export function DisposicionPanel({ children }) {
     </div>
   );
 }
+

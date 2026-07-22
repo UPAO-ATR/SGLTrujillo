@@ -22,7 +22,7 @@ export default function PaginaLogin() {
       window.location.replace("/panel");
     } catch (Falla) {
       DefinirMensajeError(
-        Falla?.message || "No fue posible iniciar sesiÃ³n."
+        Falla?.message || "No fue posible iniciar sesión."
       );
       DefinirCargando(false);
     }
@@ -48,7 +48,7 @@ export default function PaginaLogin() {
         />
 
         <Campo
-          etiqueta="ContraseÃ±a"
+          etiqueta="Contraseña"
           type="password"
           value={Clave}
           onChange={(e) => DefinirClave(e.target.value)}
@@ -60,7 +60,7 @@ export default function PaginaLogin() {
         </Boton>
 
         <details>
-          <summary>Usuarios de demostraciÃ³n</summary>
+          <summary>Usuarios de demostración</summary>
           <code>cajero1@sgl.pe / Cajero123!</code>
           <code>inspector@sgl.pe / Inspector123!</code>
           <code>admin@sgl.pe / Admin123!</code>
@@ -70,3 +70,4 @@ export default function PaginaLogin() {
     </div>
   );
 }
+

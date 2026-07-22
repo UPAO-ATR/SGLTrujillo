@@ -31,7 +31,7 @@ export default class LimiteError extends Component {
           <section className="seccion">
             <h1>No fue posible mostrar esta pantalla</h1>
             <p>
-              La sesiÃ³n serÃ¡ reiniciada para recuperar el sistema.
+              La sesión será reiniciada para recuperar el sistema.
             </p>
             <p className="mensaje error">
               {this.state.Falla?.message ||
@@ -42,7 +42,7 @@ export default class LimiteError extends Component {
               type="button"
               onClick={this.Reiniciar}
             >
-              Reiniciar sesiÃ³n
+              Reiniciar sesión
             </button>
           </section>
         </main>
@@ -52,3 +52,4 @@ export default class LimiteError extends Component {
     return this.props.children;
   }
 }
+

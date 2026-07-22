@@ -21,7 +21,7 @@ export default function PaginaPanel() {
     <div className="pagina">
       <h1>Rol no reconocido</h1>
       <p>
-        La sesiÃ³n fue iniciada, pero el perfil no contiene un rol permitido.
+        La sesión fue iniciada, pero el perfil no contiene un rol permitido.
       </p>
       <button
         className="boton"
@@ -32,8 +32,9 @@ export default function PaginaPanel() {
           window.location.replace("/login");
         }}
       >
-        Volver a iniciar sesiÃ³n
+        Volver a iniciar sesión
       </button>
     </div>
   );
 }
+
